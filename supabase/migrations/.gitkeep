@@ -1,0 +1,2 @@
+-- Version 0.1 does not create product tables.
+-- Schema, RLS, and storage policies begin with Version 0.3 (auth + profile).

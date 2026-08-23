@@ -1,0 +1,58 @@
+name: moment
+description: Private social-memory application.
+publish_to: "none"
+version: 1.8.1+19
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  equatable: ^2.0.7
+  flutter_bloc: ^9.1.1
+  get_it: ^8.2.0
+  go_router: ^16.2.4
+  supabase_flutter: ^2.17.1
+  image_picker: ^1.1.2
+  camera: ^0.11.2
+  camera_android: ^0.10.10
+  uuid: ^4.5.1
+  shared_preferences: ^2.5.3
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  bloc_test: ^10.0.0
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.4
+
+# Launcher icons: managed via IconKitchen in android/app/src/main/res and
+# ios/Runner/Assets.xcassets/AppIcon.appiconset (do not run flutter_launcher_icons).
+
+flutter:
+  uses-material-design: true
+  assets:
+    - env.json
+    - assets/images/empty_moments_polaroid.png
+    - assets/images/circles_create_illustration.png
+    - assets/images/premium_crown.png
+    - assets/images/blocked_empty.png
+    - assets/images/notifications_bell.png
+    - assets/images/app_launcher_icon.png
+    - assets/images/auth_login_logo.png
+    - assets/images/auth_logo_m.png
+    - assets/images/onboarding/
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
