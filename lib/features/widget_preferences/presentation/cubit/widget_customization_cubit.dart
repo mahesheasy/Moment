@@ -6,6 +6,8 @@ import 'package:moment/core/config/app_features.dart';
 import 'package:moment/core/result/result.dart';
 import 'package:moment/core/widget/android_widget_bridge.dart';
 import 'package:moment/core/widget/widget_display_resolver.dart';
+import 'package:moment/core/widget/widget_preview_stack_resolver.dart';
+import 'package:moment/core/widgets/widget_moment_stack.dart';
 import 'package:moment/features/circles/domain/entities/circle.dart';
 import 'package:moment/features/circles/domain/repositories/circle_repository.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
@@ -24,6 +26,8 @@ class WidgetCustomizationState extends Equatable {
     this.draft,
     this.friends = const [],
     this.circles = const [],
+    this.previewStackMoments = const [],
+    this.previewStreakCount = 0,
     this.errorMessage,
     this.savedMessage,
   });
@@ -33,6 +37,8 @@ class WidgetCustomizationState extends Equatable {
   final WidgetPreferences? draft;
   final List<FriendSummary> friends;
   final List<Circle> circles;
+  final List<WidgetStackPreviewMoment> previewStackMoments;
+  final int previewStreakCount;
   final String? errorMessage;
   final String? savedMessage;
 
@@ -48,6 +54,8 @@ class WidgetCustomizationState extends Equatable {
     WidgetPreferences? draft,
     List<FriendSummary>? friends,
     List<Circle>? circles,
+    List<WidgetStackPreviewMoment>? previewStackMoments,
+    int? previewStreakCount,
     String? errorMessage,
     String? savedMessage,
     bool clearMessages = false,
@@ -58,6 +66,8 @@ class WidgetCustomizationState extends Equatable {
       draft: draft ?? this.draft,
       friends: friends ?? this.friends,
       circles: circles ?? this.circles,
+      previewStackMoments: previewStackMoments ?? this.previewStackMoments,
+      previewStreakCount: previewStreakCount ?? this.previewStreakCount,
       errorMessage: clearMessages ? null : errorMessage ?? this.errorMessage,
       savedMessage: clearMessages ? null : savedMessage ?? this.savedMessage,
     );
@@ -70,6 +80,8 @@ class WidgetCustomizationState extends Equatable {
     draft,
     friends,
     circles,
+    previewStackMoments,
+    previewStreakCount,
     errorMessage,
     savedMessage,
   ];
@@ -94,11 +106,13 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
 
   Timer? _deviceSyncDebounce;
   Timer? _privacyRemoteSaveDebounce;
+  Timer? _previewRefreshDebounce;
 
   @override
   Future<void> close() {
     _deviceSyncDebounce?.cancel();
     _privacyRemoteSaveDebounce?.cancel();
+    _previewRefreshDebounce?.cancel();
     return super.close();
   }
 
@@ -135,6 +149,7 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
             circles: circles,
           ),
         );
+        unawaited(_refreshPreviewStack(draft));
       case Failed():
         emit(
           WidgetCustomizationState(
@@ -151,7 +166,37 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
             circles: circles,
           ),
         );
+        unawaited(_refreshPreviewStack(draft));
     }
+  }
+
+  void _schedulePreviewRefresh(WidgetPreferences draft) {
+    _previewRefreshDebounce?.cancel();
+    _previewRefreshDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () => unawaited(_refreshPreviewStack(draft)),
+    );
+  }
+
+  Future<void> _refreshPreviewStack(WidgetPreferences draft) async {
+    final loaded = await loadWidgetPreviewStack(
+      moments: _moments,
+      preferences: draft,
+      circles: _circles,
+    );
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        previewStackMoments: loaded.stack,
+        previewStreakCount: loaded.streakCount,
+      ),
+    );
+  }
+
+  Future<void> refreshPreviewStack() async {
+    final draft = state.draft;
+    if (draft == null) return;
+    await _refreshPreviewStack(draft);
   }
 
   Future<WidgetPreferences> _resolveDraft(
@@ -181,6 +226,7 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     );
     emit(state.copyWith(draft: next, clearMessages: true));
     _scheduleDeviceSync(next);
+    _schedulePreviewRefresh(next);
   }
 
   void setTypography(WidgetTypography typography) {
@@ -217,6 +263,7 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     );
     emit(state.copyWith(draft: next, clearMessages: true));
     _scheduleDeviceSync(next);
+    _schedulePreviewRefresh(next);
   }
 
   void setSelectedPerson(String? personId) {
@@ -225,6 +272,7 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     final next = draft.copyWith(selectedPersonId: personId);
     emit(state.copyWith(draft: next, clearMessages: true));
     _scheduleDeviceSync(next);
+    _schedulePreviewRefresh(next);
   }
 
   void setSelectedCircle(String? circleId) {
@@ -233,6 +281,7 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     final next = draft.copyWith(selectedCircleId: circleId);
     emit(state.copyWith(draft: next, clearMessages: true));
     _scheduleDeviceSync(next);
+    _schedulePreviewRefresh(next);
   }
 
   void setPrivacyMode(WidgetPrivacyMode mode) {
@@ -268,6 +317,15 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     _patchPrivacy((draft) => draft.copyWith(paused: value));
   }
 
+  void setShowStreak(bool value) {
+    final draft = state.draft;
+    if (draft == null) return;
+    final updated = draft.copyWith(showStreak: value);
+    emit(state.copyWith(draft: updated));
+    _scheduleDeviceSync(updated);
+    unawaited(_localCache.save(updated));
+  }
+
   void _patchPrivacy(WidgetPreferences Function(WidgetPreferences) update) {
     final draft = state.draft;
     if (draft == null) return;
@@ -296,8 +354,13 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
 
   Future<void> _persistAndSyncDevice(WidgetPreferences draft) async {
     await _localCache.save(draft);
-    await _widgetBridge.syncPreferences(draft);
+    final streakCount = switch (await _moments.getMomentStreak()) {
+      Success(:final value) => value,
+      Failed() => 0,
+    };
+    await _widgetBridge.syncPreferences(draft, streakCount: streakCount);
     await _syncWidgetMoments(draft);
+    await _refreshPreviewStack(draft);
   }
 
   Future<void> _syncWidgetMoments(WidgetPreferences draft) async {

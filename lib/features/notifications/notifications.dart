@@ -1,4 +1,3 @@
-/// Notifications feature module.
-///
-/// Realtime and FCM start in Version 0.7.
-library;
+export 'data/data.dart';
+export 'domain/domain.dart';
+export 'presentation/presentation.dart';

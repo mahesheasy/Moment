@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
@@ -7,9 +6,9 @@ import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
 import 'package:moment/core/theme/app_spacing.dart';
 import 'package:moment/core/widgets/moment_states.dart';
+import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 import 'package:moment/features/subscription/domain/entities/subscription.dart';
 import 'package:moment/features/subscription/presentation/cubit/premium_cubit.dart';
-import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
 class PremiumPage extends StatelessWidget {
   const PremiumPage({super.key});
@@ -23,14 +22,15 @@ class PremiumPage extends StatelessWidget {
   }
 }
 
-const _featurePairs = [
-  ('Premium widgets', 'Advanced circles'),
-  ('Premium themes', 'Custom prompts'),
-  ('Unlimited memories', 'Premium memory themes'),
-  ('Time Travel+', 'HD archive'),
-];
-
-const _extraFeatures = [
+const _features = [
+  'Premium widgets',
+  'Advanced circles',
+  'Premium themes',
+  'Custom prompts',
+  'Unlimited memories',
+  'Premium memory themes',
+  'Time Travel+',
+  'HD archive',
   'Circles — private groups for your people',
   'Home widget themes — Love, Family, Friends & Bestie',
 ];
@@ -55,15 +55,13 @@ class _PremiumView extends StatelessWidget {
       },
       builder: (context, state) {
         if (state.status == PremiumStatus.loading && state.offering == null) {
-          return Scaffold(
+          return const Scaffold(
             body: Center(child: MomentLoading()),
           );
         }
         if (state.status == PremiumStatus.failure && state.offering == null) {
           return Scaffold(
-            appBar: AppBar(
-              title: Text('Moment+'),
-            ),
+            appBar: AppBar(title: const Text('Moment+')),
             body: MomentErrorState(
               message: state.errorMessage ?? 'Could not load Moment+.',
               actionLabel: 'Retry',
@@ -74,7 +72,7 @@ class _PremiumView extends StatelessWidget {
 
         final offering = state.offering;
         if (offering == null) {
-          return Scaffold(
+          return const Scaffold(
             body: Center(child: MomentLoading()),
           );
         }
@@ -89,26 +87,25 @@ class _PremiumView extends StatelessWidget {
             .firstOrNull;
 
         return Scaffold(
+          backgroundColor: AppColors.backgroundDark,
           appBar: AppBar(
             elevation: 0,
+            backgroundColor: AppColors.backgroundDark,
             leading: IconButton(
-              icon: Icon(AppIcons.back, size: 18),
+              icon: const Icon(AppIcons.back, size: 18),
               onPressed: () => context.pop(),
             ),
             title: Text(
               'Moment+',
-              style: SettingsType.title(AppColors.textPrimaryDark)
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: SettingsType.title(Colors.white).copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             centerTitle: true,
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.huge,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,11 +116,11 @@ class _PremiumView extends StatelessWidget {
                       children: [
                         RichText(
                           text: TextSpan(
-                            style: SettingsType.title(AppColors.textPrimaryDark)
-                                .copyWith(
-                              fontSize: 24,
+                            style: SettingsType.title(Colors.white).copyWith(
+                              fontSize: 26,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
+                              letterSpacing: -0.3,
                             ),
                             children: [
                               const TextSpan(text: 'Make every moment '),
@@ -133,134 +130,136 @@ class _PremiumView extends StatelessWidget {
                                   foreground: Paint()
                                     ..shader = AppColors.bloomGradient
                                         .createShader(
-                                      const Rect.fromLTWH(0, 0, 80, 30),
+                                      const Rect.fromLTWH(0, 0, 90, 32),
                                     ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Text(
                           isPremium
                               ? 'Premium customization and unlimited memories are unlocked.'
                               : 'Moment+ adds customization, memories, and more to make Moment truly yours.',
-                          style: SettingsType.body(AppColors.textTertiaryDark),
+                          style: SettingsType.body(
+                            AppColors.textSecondaryDark,
+                          ).copyWith(
+                            fontSize: 14,
+                            height: 1.45,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Image.asset(
                       'assets/images/premium_crown.png',
-                      width: 100,
-                      height: 100,
+                      width: 88,
+                      height: 88,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
-                        width: 100,
-                        height: 100,
+                        width: 88,
+                        height: 88,
                         decoration: BoxDecoration(
                           gradient: AppColors.bloomGradient,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.workspace_premium_rounded,
                           color: Colors.white,
-                          size: 48,
+                          size: 40,
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: 28),
               Text(
                 'Everything in Moment+',
-                style: SettingsType.title(AppColors.textPrimaryDark)
-                    .copyWith(fontWeight: FontWeight.w600),
+                style: SettingsType.title(Colors.white).copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              SizedBox(height: AppSpacing.md),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceDark,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.borderDark.withValues(alpha: 0.8),
-                  ),
                 ),
                 child: Column(
                   children: [
-                    for (final pair in _featurePairs) ...[
-                      _FeatureRow(left: pair.$1, right: pair.$2),
-                      if (pair != _featurePairs.last)
-                        Divider(
-                          height: 20,
-                          color: AppColors.borderDark.withValues(alpha: 0.5),
-                        ),
-                    ],
-                    for (final extra in _extraFeatures) ...[
-                      Divider(
-                        height: 20,
-                        color: AppColors.borderDark.withValues(alpha: 0.5),
-                      ),
-                      _FeatureRow(left: extra, right: null),
+                    for (var i = 0; i < _features.length; i++) ...[
+                      _FeatureItem(label: _features[i]),
+                      if (i != _features.length - 1)
+                        const SizedBox(height: 2),
                     ],
                   ],
                 ),
               ),
               if (!isPremium) ...[
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: 28),
                 Text(
                   'Choose your plan',
-                  style: SettingsType.title(AppColors.textPrimaryDark)
-                      .copyWith(fontWeight: FontWeight.w500, fontSize: 15),
+                  style: SettingsType.title(Colors.white).copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                SizedBox(height: AppSpacing.md),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (monthly != null)
-                      Expanded(
-                        child: _PlanCard(
-                          plan: monthly,
-                          selected: state.selectedPlanId == monthly.id,
-                          badge: 'Popular',
-                          subtitle: 'Cancel anytime',
-                          onTap: isCheckingOut
-                              ? null
-                              : () => context
-                                  .read<PremiumCubit>()
-                                  .selectPlan(monthly.id),
+                const SizedBox(height: 12),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (monthly != null)
+                        Expanded(
+                          child: _PlanCard(
+                            plan: monthly,
+                            selected: state.selectedPlanId == monthly.id,
+                            badge: 'Popular',
+                            subtitle: 'Cancel anytime',
+                            onTap: isCheckingOut
+                                ? null
+                                : () => context
+                                    .read<PremiumCubit>()
+                                    .selectPlan(monthly.id),
+                          ),
                         ),
-                      ),
-                    if (monthly != null && yearly != null)
-                      SizedBox(width: 10),
-                    if (yearly != null)
-                      Expanded(
-                        child: _PlanCard(
-                          plan: yearly,
-                          selected: state.selectedPlanId == yearly.id,
-                          badge: 'Save 41%',
-                          onTap: isCheckingOut
-                              ? null
-                              : () => context
-                                  .read<PremiumCubit>()
-                                  .selectPlan(yearly.id),
+                      if (monthly != null && yearly != null)
+                        const SizedBox(width: 10),
+                      if (yearly != null)
+                        Expanded(
+                          child: _PlanCard(
+                            plan: yearly,
+                            selected: state.selectedPlanId == yearly.id,
+                            badge: 'Save 41%',
+                            onTap: isCheckingOut
+                                ? null
+                                : () => context
+                                    .read<PremiumCubit>()
+                                    .selectPlan(yearly.id),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-                SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: 24),
                 _PremiumContinueButton(
                   isLoading: isCheckingOut,
                   enabled: !isCheckingOut && state.selectedPlanId != null,
                   onTap: () => context.read<PremiumCubit>().subscribe(),
                 ),
               ],
-              SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: 24),
               _FreeTierFooter(
                 limit: offering.limits.freeMemoryLimit,
                 count: offering.limits.memoryCount,
@@ -273,46 +272,39 @@ class _PremiumView extends StatelessWidget {
   }
 }
 
-class _FeatureRow extends StatelessWidget {
-  const _FeatureRow({required this.left, this.right});
-
-  final String left;
-  final String? right;
-
-  @override
-  Widget build(BuildContext context) {
-    if (right == null) {
-      return _FeatureCell(label: left);
-    }
-    return Row(
-      children: [
-        Expanded(child: _FeatureCell(label: left)),
-        SizedBox(width: 8),
-        Expanded(child: _FeatureCell(label: right!)),
-      ],
-    );
-  }
-}
-
-class _FeatureCell extends StatelessWidget {
-  const _FeatureCell({required this.label});
+class _FeatureItem extends StatelessWidget {
+  const _FeatureItem({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(Icons.check_rounded, size: 16, color: AppColors.violet),
-        SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            label,
-            style: SettingsType.caption(AppColors.textSecondaryDark)
-                .copyWith(fontSize: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.check_rounded,
+              size: 17,
+              color: AppColors.violet,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: SettingsType.body(AppColors.textSecondaryDark).copyWith(
+                fontSize: 14,
+                height: 1.35,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -340,95 +332,106 @@ class _PlanCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.accentSoftDark.withValues(alpha: 0.35)
+              ? AppColors.violet.withValues(alpha: 0.12)
               : AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? AppColors.violet : AppColors.borderDark,
-            width: selected ? 1.5 : 1,
-          ),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (badge != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.violet.withValues(alpha: 0.2)
-                      : AppColors.surfaceElevatedDark,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badge!,
-                  style: SettingsType.caption(
-                    selected ? AppColors.violet : AppColors.textTertiaryDark,
-                  ).copyWith(fontSize: 9, fontWeight: FontWeight.w600),
-                ),
-              ),
-            if (badge != null) SizedBox(height: 10),
             Row(
               children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
                       color: selected
-                          ? AppColors.violet
-                          : AppColors.textTertiaryDark,
-                      width: 1.5,
+                          ? AppColors.violet.withValues(alpha: 0.2)
+                          : AppColors.surfaceElevatedDark,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: SettingsType.caption(
+                        selected ? AppColors.violet : AppColors.textTertiaryDark,
+                      ).copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  child: selected
-                      ? Center(
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AppColors.violet,
-                              shape: BoxShape.circle,
-                            ),
+                const Spacer(),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected
+                        ? AppColors.violet
+                        : Colors.transparent,
+                    border: selected
+                        ? null
+                        : Border.all(
+                            color: AppColors.textTertiaryDark
+                                .withValues(alpha: 0.5),
+                            width: 1.5,
                           ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 13,
+                          color: Colors.white,
                         )
                       : null,
                 ),
-                Spacer(),
               ],
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 16),
             RichText(
               text: TextSpan(
-                style: SettingsType.title(AppColors.textPrimaryDark)
-                    .copyWith(fontWeight: FontWeight.w600, fontSize: 20),
+                style: SettingsType.title(Colors.white).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 24,
+                  height: 1.1,
+                ),
                 children: [
                   TextSpan(text: plan.formattedPrice),
                   TextSpan(
                     text: isMonthly ? '/mo' : '/yr',
                     style: SettingsType.caption(AppColors.textTertiaryDark)
-                        .copyWith(fontSize: 11, fontWeight: FontWeight.w400),
+                        .copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               isMonthly ? 'Billed monthly' : 'Billed yearly',
-              style: SettingsType.caption(AppColors.textTertiaryDark)
-                  .copyWith(fontSize: 10, fontWeight: FontWeight.w400),
+              style: SettingsType.caption(AppColors.textTertiaryDark).copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
             ),
             if (subtitle != null) ...[
-              SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 subtitle!,
                 style: SettingsType.caption(
                   isMonthly ? AppColors.textTertiaryDark : AppColors.violet,
-                ).copyWith(fontSize: 10, fontWeight: FontWeight.w400),
+                ).copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ],
@@ -460,22 +463,22 @@ class _PremiumContinueButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           child: Ink(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 15),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               gradient: AppColors.bloomGradient,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.violet.withValues(alpha: 0.25),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  color: AppColors.violet.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: isLoading
-                ? SizedBox(
-                    height: 18,
-                    width: 18,
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
@@ -484,16 +487,18 @@ class _PremiumContinueButton extends StatelessWidget {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.workspace_premium_rounded,
-                        size: 16,
+                        size: 18,
                         color: Colors.white,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
                         'Continue',
-                        style: SettingsType.title(Colors.white)
-                            .copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: SettingsType.title(Colors.white).copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -513,27 +518,37 @@ class _FreeTierFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderDark.withValues(alpha: 0.8)),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.shield_outlined, color: AppColors.violet, size: 20),
-          SizedBox(width: 10),
+          Icon(
+            Icons.shield_outlined,
+            color: AppColors.violet.withValues(alpha: 0.9),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Free includes $limit saved memories.',
-                  style: SettingsType.body(AppColors.textSecondaryDark),
+                  style: SettingsType.body(AppColors.textSecondaryDark).copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   'You have $count.',
-                  style: SettingsType.caption(AppColors.textTertiaryDark),
+                  style: SettingsType.caption(AppColors.textTertiaryDark).copyWith(
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),

@@ -5,6 +5,7 @@ import 'package:moment/core/config/app_env.dart';
 import 'package:moment/core/firebase/firebase_bootstrap.dart';
 import 'package:moment/core/logging/app_logger.dart';
 import 'package:moment/core/supabase/supabase_bootstrap.dart';
+import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
 
 Future<void> bootstrap({
   AppEnv? env,
@@ -27,6 +28,7 @@ Future<void> bootstrap({
 
   await sl<SupabaseBootstrap>().initialize(resolvedEnv);
   await sl<FirebaseBootstrap>().initialize();
+  await sl<SetupPreferencesLocalCache>().load();
 
   runApp(MomentApp(router: sl()));
 }

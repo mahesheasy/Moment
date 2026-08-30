@@ -1,13 +1,13 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/router/app_routes.dart';
+import 'package:moment/core/navigation/memories_overlay_controller.dart';
 import 'package:moment/core/realtime/moment_realtime_subscriber.dart';
-import 'package:moment/core/theme/app_breakpoints.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
 import 'package:moment/core/theme/app_spacing.dart';
@@ -20,6 +20,7 @@ import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
 import 'package:moment/features/moments/presentation/cubit/pings_cubit.dart';
 import 'package:moment/features/moments/presentation/widgets/home_pings_section.dart';
+import 'package:moment/features/moments/presentation/widgets/live_camera_host.dart';
 import 'package:moment/features/moments/presentation/widgets/reaction_picker_sheet.dart';
 import 'package:moment/features/moments/presentation/widgets/tinder_moment_deck.dart';
 import 'package:moment/features/profile/presentation/cubit/profile_cubit.dart';
@@ -41,7 +42,7 @@ class _HomePageState extends State<HomePage> {
     _homeCubit = sl<HomeCubit>()..load();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      sl<MomentRealtimeSubscriber>().listen(() {
+      sl<MomentRealtimeSubscriber>().listen((_) {
         if (mounted) _homeCubit.load();
       });
     });
@@ -61,23 +62,61 @@ class _HomePageState extends State<HomePage> {
         BlocProvider(create: (_) => sl<ProfileCubit>()..load()),
         BlocProvider(create: (_) => sl<FriendsCubit>()..load()),
         BlocProvider(create: (_) => sl<PingsCubit>()..load()),
+        BlocProvider(create: (_) => sl<CameraCubit>()..initialize()),
       ],
       child: const _HomeView(),
     );
   }
 }
 
-class _HomeView extends StatelessWidget {
+class _HomeView extends StatefulWidget {
   const _HomeView();
 
   @override
+  State<_HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<_HomeView> {
+  var _upwardDrag = 0.0;
+
+  void _openHistory(BuildContext context) {
+    final home = context.read<HomeCubit>();
+    final profile = context.read<ProfileCubit>();
+    final friends = context.read<FriendsCubit>();
+    final pings = context.read<PingsCubit>();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.backgroundDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) {
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: home),
+            BlocProvider.value(value: profile),
+            BlocProvider.value(value: friends),
+            BlocProvider.value(value: pings),
+          ],
+          child: const _HistorySheet(),
+        );
+      },
+    );
+  }
+
+  void _openMemories() {
+    sl<MemoriesOverlayController>().open();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final maxWidth = AppBreakpoints.contentMaxWidth(context);
-    final padding = AppBreakpoints.pagePadding(context);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return ColoredBox(
-      color: AppColors.backgroundDark,
-      child: BlocConsumer<HomeCubit, HomeState>(
+      color: Colors.black,
+      child: BlocListener<HomeCubit, HomeState>(
         listener: (context, state) {
           if (state.errorMessage != null) {
             ScaffoldMessenger.of(
@@ -90,48 +129,467 @@ class _HomeView extends StatelessWidget {
             ).showSnackBar(SnackBar(content: Text(state.actionMessage!)));
           }
         },
-        builder: (context, state) {
-          return SafeArea(
-            bottom: false,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: RefreshIndicator(
-                  color: AppColors.violet,
-                  onRefresh: () => context.read<HomeCubit>().load(),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: padding.copyWith(top: AppSpacing.lg, bottom: 120),
-                    children: [
-                      const _HomeHeader(),
-                      SizedBox(height: AppSpacing.xxl),
-                      switch (state.status) {
-                        HomeStatus.loading ||
-                        HomeStatus.initial => const _HeroPlaceholder(),
-                        HomeStatus.failure => MomentErrorState(
-                          message: state.errorMessage ?? 'Could not load home.',
-                          actionLabel: 'Retry',
-                          onAction: () => context.read<HomeCubit>().load(),
-                        ),
-                        HomeStatus.empty => const _EmptyMomentCard(),
-                        HomeStatus.loaded => const _HeroStoryCard(),
-                      },
-                      SizedBox(height: AppSpacing.xxxl),
-                      const HomePingsSection(),
-                    ],
+        child: GestureDetector(
+          onVerticalDragUpdate: (details) {
+            if (details.delta.dy < 0) {
+              _upwardDrag += details.delta.dy;
+              if (_upwardDrag < -72) {
+                _upwardDrag = 0;
+                _openMemories();
+              }
+            }
+          },
+          onVerticalDragEnd: (_) => _upwardDrag = 0,
+          child: LiveCameraHost(
+          pauseWhenCovered: true,
+          builder: (context, session) {
+            return SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  const _HomeTopBar(),
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          session.viewfinder,
+                          Positioned(
+                            top: 12,
+                            left: 12,
+                            child: _FlashChip(
+                              enabled: session.flashEnabled,
+                              onTap: session.toggleFlash,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _HomeCaptureBar(
+                    capturing: session.capturing,
+                    previewBytes: context.watch<CameraCubit>().state.imageBytes,
+                    onGallery: session.pickGallery,
+                    onCapture: session.capture,
+                    onFlip: session.flip,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _MemoriesSwipeHandle(onOpen: _openMemories),
+                  _HistoryHandle(onTap: () => _openHistory(context)),
+                  SizedBox(height: 16 + bottomInset),
+                ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
+        ),
       ),
     );
   }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+class _MemoriesSwipeHandle extends StatelessWidget {
+  const _MemoriesSwipeHandle({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onOpen,
+      onVerticalDragEnd: (details) {
+        if ((details.primaryVelocity ?? 0) < -280) onOpen();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.keyboard_arrow_up_rounded,
+              color: Colors.white70,
+              size: 20,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Memories',
+              style: SettingsType.title(
+                Colors.white70,
+              ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTopBar extends StatelessWidget {
+  const _HomeTopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        0,
+      ),
+      child: Row(
+        children: [
+          _ProfileCircleButton(),
+          Spacer(),
+          _FriendsPill(),
+          Spacer(),
+          _MessagesButton(),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileCircleButton extends StatelessWidget {
+  const _ProfileCircleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ProfileCubit, ProfileState>(
+      builder: (context, state) {
+        final profile = state.profile;
+        return GestureDetector(
+          onTap: () => context.go(AppRoutes.profile),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF2A2A2A),
+              border: Border.all(color: Colors.white24),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: profile == null
+                ? const Icon(AppIcons.profile, color: Colors.white, size: 22)
+                : MomentAvatar(
+                    name: profile.displayName,
+                    imageUrl: profile.avatarUrl,
+                    size: 42,
+                  ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FriendsPill extends StatelessWidget {
+  const _FriendsPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.friends),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(AppIcons.circlesFilled, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Friends',
+              style: SettingsType.title(
+                Colors.white,
+              ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagesButton extends StatelessWidget {
+  const _MessagesButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<FriendsCubit, FriendsState>(
+      builder: (context, state) {
+        final badge = state.pendingCount > 0;
+        return GestureDetector(
+          onTap: () => context.push(AppRoutes.notifications),
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2A2A2A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                if (badge)
+                  const Positioned(
+                    top: 4,
+                    right: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE53935),
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(width: 8, height: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FlashChip extends StatelessWidget {
+  const _FlashChip({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.35),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          enabled ? AppIcons.flash : AppIcons.flashOff,
+          color: Colors.white,
+          size: 18,
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeCaptureBar extends StatelessWidget {
+  const _HomeCaptureBar({
+    required this.capturing,
+    required this.onGallery,
+    required this.onCapture,
+    required this.onFlip,
+    this.previewBytes,
+  });
+
+  final bool capturing;
+  final VoidCallback onGallery;
+  final VoidCallback onCapture;
+  final VoidCallback onFlip;
+  final Uint8List? previewBytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 36),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: onGallery,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: previewBytes == null
+                    ? const ColoredBox(
+                        color: Color(0xFF2A2A2A),
+                        child: Icon(
+                          AppIcons.gallery,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      )
+                    : Image.memory(previewBytes!, fit: BoxFit.cover),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: capturing ? null : onCapture,
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.sendCoral, width: 4),
+              ),
+              child: Center(
+                child: capturing
+                    ? const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Container(
+                        width: 68,
+                        height: 68,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onFlip,
+            child: const SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(AppIcons.flip, color: Colors.white, size: 28),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryHandle extends StatelessWidget {
+  const _HistoryHandle({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      onVerticalDragEnd: (details) {
+        if ((details.primaryVelocity ?? 0).abs() > 240) onTap();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'History',
+              style: SettingsType.title(
+                Colors.white,
+              ).copyWith(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistorySheet extends StatelessWidget {
+  const _HistorySheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * 0.92;
+
+    return SizedBox(
+      height: height,
+      child: SafeArea(
+        child: BlocBuilder<HomeCubit, HomeState>(
+          builder: (context, state) {
+            return Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: _HistoryHeader(),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    color: AppColors.violet,
+                    onRefresh: () => context.read<HomeCubit>().load(),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        AppSpacing.xl,
+                        AppSpacing.lg,
+                        40,
+                      ),
+                      children: [
+                        switch (state.status) {
+                          HomeStatus.loading ||
+                          HomeStatus.initial => const _HeroPlaceholder(),
+                          HomeStatus.failure => MomentErrorState(
+                            message:
+                                state.errorMessage ?? 'Could not load home.',
+                            actionLabel: 'Retry',
+                            onAction: () => context.read<HomeCubit>().load(),
+                          ),
+                          HomeStatus.empty => const _EmptyMomentCard(),
+                          HomeStatus.loaded => const _HeroStoryCard(),
+                        },
+                        const SizedBox(height: AppSpacing.xxxl),
+                        const HomePingsSection(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryHeader extends StatelessWidget {
+  const _HistoryHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +600,6 @@ class _HomeHeader extends StatelessWidget {
         final greeting = timeSensitiveGreeting();
 
         return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
@@ -155,89 +612,22 @@ class _HomeHeader extends StatelessWidget {
                     ).copyWith(fontWeight: FontWeight.w400),
                   ),
                   if (firstName.isNotEmpty) ...[
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       '$firstName 👋',
-                      style: SettingsType.body(AppColors.violet).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: SettingsType.body(
+                        AppColors.violet,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                   ],
                 ],
               ),
             ),
-            const _NotificationButton(),
-            SizedBox(width: AppSpacing.sm),
-            GestureDetector(
-              onTap: () => context.go(AppRoutes.profile),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  MomentAvatar(
-                    name: profile?.displayName,
-                    imageUrl: profile?.avatarUrl,
-                    size: 36,
-                    showBorder: true,
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4ADE80),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.backgroundDark,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(AppIcons.close, color: Colors.white, size: 20),
             ),
           ],
-        );
-      },
-    );
-  }
-}
-
-class _NotificationButton extends StatelessWidget {
-  const _NotificationButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FriendsCubit, FriendsState>(
-      builder: (context, state) {
-        final badge = state.pendingCount > 0;
-        return IconButton(
-          onPressed: () => context.push(AppRoutes.notifications),
-          tooltip: 'Friends',
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(
-                AppIcons.notifications,
-                color: AppColors.textSecondaryDark,
-                size: 20,
-              ),
-              if (badge)
-                Positioned(
-                  top: -1,
-                  right: -1,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Color(0xFFE53935),
-                      shape: BoxShape.circle,
-                    ),
-                    child: SizedBox(width: 7, height: 7),
-                  ),
-                ),
-            ],
-          ),
         );
       },
     );
@@ -271,8 +661,12 @@ class _EmptyMomentCard extends StatelessWidget {
       title: 'You\'re all caught up',
       subtitle: 'New moments land here. Viewed ones move to Memories.',
       buttonLabel: 'Capture a moment',
-      onButtonTap: () => context.push(AppRoutes.camera),
-      onTap: () => context.push(AppRoutes.camera),
+      onButtonTap: () {
+        Navigator.pop(context);
+      },
+      onTap: () {
+        Navigator.pop(context);
+      },
     );
   }
 }
@@ -344,7 +738,7 @@ class _HeroStoryCardState extends State<_HeroStoryCard> {
                 }
               },
             ),
-            SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.md),
             Text(
               state.storyMoments.length > 1
                   ? '${state.storyMoments.length} unviewed  ·  swipe left when you\'ve seen this'

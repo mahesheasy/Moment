@@ -14,6 +14,8 @@ class WidgetCycleAction : ActionCallback {
     ) {
         val delta = parameters[DeltaKey] ?: 1
         WidgetMomentQueue.cycle(context, delta)
+        val activeMomentId = MomentWidgetDataStore.load(context).momentId
+        WidgetMediaPrivacyPreview.beginSession(context, activeMomentId)
         val manager = GlanceAppWidgetManager(context)
         val ids = manager.getGlanceIds(MomentGlanceWidget::class.java)
         ids.forEach { id ->

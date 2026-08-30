@@ -11,6 +11,7 @@ import 'package:moment/core/widgets/moment_avatar.dart';
 import 'package:moment/core/widgets/moment_button.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/circles/domain/entities/circle.dart';
+import 'package:moment/core/widgets/moment_hero_tags.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
 import 'package:moment/features/moments/presentation/pages/camera_sent_page.dart';
 import 'package:moment/features/moments/presentation/widgets/camera_chrome.dart';
@@ -30,11 +31,23 @@ class CameraSendToPage extends StatelessWidget {
           final navigator = Navigator.of(context);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             navigator.push(
-              MaterialPageRoute<void>(
-                builder: (_) => BlocProvider.value(
+              PageRouteBuilder<void>(
+                opaque: true,
+                transitionDuration: const Duration(milliseconds: 420),
+                reverseTransitionDuration: const Duration(milliseconds: 320),
+                pageBuilder: (_, _, _) => BlocProvider.value(
                   value: cubit,
                   child: const CameraSentPage(),
                 ),
+                transitionsBuilder: (_, animation, _, child) {
+                  return FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                    child: child,
+                  );
+                },
               ),
             );
           });
@@ -135,16 +148,22 @@ class CameraSendToPage extends StatelessWidget {
                     AppSpacing.xl,
                     AppSpacing.lg,
                   ),
-                  child: CameraGradientButton(
-                    label: uploading
-                        ? 'Sending…'
-                        : state.hasSelection
-                        ? 'Send to ${state.selectedRecipientIds.length + state.selectedCircleIds.length}'
-                        : 'Choose someone',
-                    isLoading: uploading,
-                    onPressed: uploading
-                        ? null
-                        : () => context.read<CameraCubit>().send(),
+                  child: Hero(
+                    tag: MomentHeroTags.cameraSendSuccess,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CameraGradientButton(
+                        label: uploading
+                            ? 'Sending…'
+                            : state.hasSelection
+                            ? 'Send to ${state.selectedRecipientIds.length + state.selectedCircleIds.length}'
+                            : 'Choose someone',
+                        isLoading: uploading,
+                        onPressed: uploading
+                            ? null
+                            : () => context.read<CameraCubit>().send(),
+                      ),
+                    ),
                   ),
                 ),
               ],

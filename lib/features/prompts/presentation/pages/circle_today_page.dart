@@ -3,11 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/router/app_routes.dart';
+import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_radius.dart';
 import 'package:moment/core/theme/app_spacing.dart';
-import 'package:moment/core/widgets/moment_button.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/prompts/presentation/cubit/prompt_cubit.dart';
+import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
 class CircleTodayPage extends StatelessWidget {
   const CircleTodayPage({required this.circleId, super.key});
@@ -119,20 +120,42 @@ class _CircleTodayView extends StatelessWidget {
         final isSaving = state.status == CircleTodayStatus.saving;
 
         return Scaffold(
-          appBar: AppBar(title: Text('$emoji $name')),
+          backgroundColor: AppColors.backgroundDark,
+          appBar: AppBar(
+            backgroundColor: AppColors.backgroundDark,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            title: Text(
+              '$emoji $name',
+              style: SettingsType.title(Colors.white).copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
           body: ListView(
             padding: const EdgeInsets.all(AppSpacing.xxl),
             children: [
-              Text('TODAY', style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                'TODAY',
+                style: SettingsType.caption(AppColors.textTertiaryDark).copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                ),
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 summary.prompt.promptText,
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: SettingsType.title(Colors.white).copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               Text(
                 '${responses.length} ${responses.length == 1 ? 'moment' : 'moments'}',
-                style: Theme.of(context).textTheme.titleMedium,
+                style: SettingsType.body(AppColors.textSecondaryDark),
               ),
               const SizedBox(height: AppSpacing.xxl),
               if (responses.isEmpty)
@@ -167,9 +190,9 @@ class _CircleTodayView extends StatelessWidget {
                 ),
               const SizedBox(height: AppSpacing.xxxl),
               if (!state.hasResponded)
-                MomentButton(
+                _PromptActionButton(
                   label: 'Respond with a moment',
-                  onPressed: isSaving
+                  onTap: isSaving
                       ? null
                       : () => context.push(
                           AppRoutes.cameraForPrompt(
@@ -179,11 +202,11 @@ class _CircleTodayView extends StatelessWidget {
                         ),
                 ),
               const SizedBox(height: AppSpacing.lg),
-              MomentButton(
+              _PromptActionButton(
                 label: 'Save as Memory',
-                variant: MomentButtonVariant.secondary,
+                secondary: true,
                 isLoading: isSaving,
-                onPressed: isSaving || responses.isEmpty
+                onTap: isSaving || responses.isEmpty
                     ? null
                     : () => _saveAsMemory(context, state),
               ),
@@ -191,6 +214,91 @@ class _CircleTodayView extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PromptActionButton extends StatelessWidget {
+  const _PromptActionButton({
+    required this.label,
+    this.onTap,
+    this.secondary = false,
+    this.isLoading = false,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool secondary;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (secondary) {
+      return SizedBox(
+        width: double.infinity,
+        child: TextButton(
+          onPressed: isLoading ? null : onTap,
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textSecondaryDark,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  label,
+                  style: SettingsType.body(AppColors.textSecondaryDark).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: onTap == null && !isLoading
+            ? null
+            : AppColors.bloomGradient,
+        color: onTap == null && !isLoading
+            ? AppColors.surfaceElevatedDark
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: isLoading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: SettingsType.body(Colors.white).copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

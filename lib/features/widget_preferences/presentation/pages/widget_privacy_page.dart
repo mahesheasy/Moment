@@ -130,9 +130,16 @@ class _WidgetPrivacyView extends StatelessWidget {
               Center(
                 child: WidgetStylePreview(
                   preferences: draft,
+                  stackMoments: state.previewStackMoments.isEmpty
+                      ? null
+                      : state.previewStackMoments,
                   headerTitle: previewPerson.name,
+                  relativeTime: state.previewStackMoments.isNotEmpty
+                      ? state.previewStackMoments.first.relativeTime
+                      : 'Just now',
                   forcePrivacyMode: draft.privacyMode,
                   previewSize: 228,
+                  streakCount: state.previewStreakCount,
                 ),
               ),
               const SizedBox(height: 28),

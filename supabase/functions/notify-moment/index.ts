@@ -184,18 +184,26 @@ Deno.serve(async (request) => {
     const senderName = sender?.display_name ?? "A friend";
 
     const data: Record<string, string> = {
-      type: "moment",
+      type: "new_moment",
       momentId: moment.id,
+      moment_id: moment.id,
+      recipientId: recipient_id,
+      recipient_id: recipient_id,
       senderId: moment.sender_id,
+      sender_id: moment.sender_id,
       senderName,
+      title: headerTitle,
       headerTitle,
       headerEmoji,
       caption: moment.caption ?? "",
       relativeTime: "now",
       createdAt: moment.created_at,
+      created_at: moment.created_at,
       createdAtMillis: String(Date.parse(moment.created_at) || Date.now()),
       imageUrl: signedImage?.signedUrl ?? "",
+      image_url: signedImage?.signedUrl ?? "",
       avatarUrl,
+      avatar_url: avatarUrl,
       widgetEligible: widgetEligible ? "true" : "false",
       notificationTitle: senderName,
       notificationBody: moment.caption?.trim()

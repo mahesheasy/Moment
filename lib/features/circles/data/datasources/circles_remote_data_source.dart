@@ -3,14 +3,16 @@ import 'dart:typed_data';
 import 'package:moment/core/errors/failures.dart';
 import 'package:moment/features/circles/data/circle_image_resolver.dart';
 import 'package:moment/features/circles/domain/entities/circle.dart';
+import 'package:moment/features/moments/data/datasources/moments_remote_data_source.dart';
 import 'package:moment/features/profile/data/models/profile_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CirclesRemoteDataSource {
-  CirclesRemoteDataSource(this._client, this._imageResolver);
+  CirclesRemoteDataSource(this._client, this._imageResolver, this._moments);
 
   final SupabaseClient _client;
   final CircleImageResolver _imageResolver;
+  final MomentsRemoteDataSource _moments;
   static const _avatarsBucket = 'circle-avatars';
 
   Future<List<Circle>> getMyCircles(String userId) async {
@@ -39,65 +41,27 @@ class CirclesRemoteDataSource {
   ) async {
     if (circleIds.isEmpty) return {};
 
-    final data = await _client
-        .from('prompt_responses')
-        .select(
-          'circle_id, created_at, moment:moments(storage_path, created_at, sender:sender_id(display_name))',
-        )
-        .inFilter('circle_id', circleIds)
-        .order('created_at', ascending: false);
-
-    final counts = <String, int>{};
     final summaries = <String, CircleActivitySummary>{};
 
-    for (final row in data as List) {
-      final map = Map<String, dynamic>.from(row as Map);
-      final circleId = map['circle_id'] as String;
-      counts[circleId] = (counts[circleId] ?? 0) + 1;
-
-      if (summaries.containsKey(circleId)) continue;
-
-      final momentJson = map['moment'] as Map?;
-      String? imageUrl;
-      String? senderName;
-      DateTime? activityAt;
-
-      if (momentJson != null) {
-        final storagePath = momentJson['storage_path'] as String?;
-        if (storagePath != null) {
-          try {
-            imageUrl = await _client.storage
-                .from('moments')
-                .createSignedUrl(storagePath, 3600);
-          } on Object {
-            imageUrl = null;
-          }
+    await Future.wait(
+      circleIds.map((circleId) async {
+        final moments = await _moments.listMomentsSharedToCircle(
+          circleId: circleId,
+        );
+        if (moments.isEmpty) {
+          summaries[circleId] = const CircleActivitySummary();
+          return;
         }
-        final sender = momentJson['sender'] as Map?;
-        senderName = sender?['display_name'] as String?;
-        final created =
-            momentJson['created_at'] as String? ?? map['created_at'] as String?;
-        if (created != null) {
-          activityAt = DateTime.parse(created);
-        }
-      }
 
-      summaries[circleId] = CircleActivitySummary(
-        latestSenderName: senderName,
-        latestActivityAt: activityAt,
-        latestImageUrl: imageUrl,
-      );
-    }
-
-    for (final entry in counts.entries) {
-      final existing = summaries[entry.key];
-      summaries[entry.key] = CircleActivitySummary(
-        momentCount: entry.value,
-        latestSenderName: existing?.latestSenderName,
-        latestActivityAt: existing?.latestActivityAt,
-        latestImageUrl: existing?.latestImageUrl,
-      );
-    }
+        final latest = moments.first;
+        summaries[circleId] = CircleActivitySummary(
+          momentCount: moments.length,
+          latestSenderName: latest.sender.displayName,
+          latestActivityAt: latest.createdAt,
+          latestImageUrl: latest.imageUrl,
+        );
+      }),
+    );
 
     return summaries;
   }

@@ -15,6 +15,10 @@ abstract class FriendsRepository {
 
   Future<Result<UserProfile>> getFriendProfile(String userId);
 
+  Future<Result<int>> getMutualFriendCount(String userId);
+
+  Future<Result<DateTime?>> getFriendshipSince(String friendId);
+
   Future<Result<FriendRelationship>> getRelationship(String userId);
 
   Future<Result<String?>> getPendingRequestId(String userId);

@@ -102,6 +102,11 @@ class FriendsRepositoryImpl implements FriendsRepository {
       final suggestions = <SuggestedFriend>[];
       for (final row in rows) {
         final relationship = await _resolveRelationship(userId, row.profile.id);
+        if (relationship == FriendRelationship.friends ||
+            relationship == FriendRelationship.blocked ||
+            relationship == FriendRelationship.blockedBy) {
+          continue;
+        }
         final pending = await _remote.findPendingRequest(userId, row.profile.id);
         suggestions.add(
           SuggestedFriend(
@@ -125,6 +130,36 @@ class FriendsRepositoryImpl implements FriendsRepository {
 
     try {
       return Success(await _remote.getProfile(userId));
+    } on Object catch (error) {
+      if (error is Failure) return Failed(error);
+      return Failed(_remote.mapError(error));
+    }
+  }
+
+  @override
+  Future<Result<int>> getMutualFriendCount(String userId) async {
+    final currentUserId = _userId;
+    if (currentUserId == null) return const Failed(AuthenticationFailure());
+
+    try {
+      return Success(
+        await _remote.getMutualFriendCount(currentUserId, userId),
+      );
+    } on Object catch (error) {
+      if (error is Failure) return Failed(error);
+      return Failed(_remote.mapError(error));
+    }
+  }
+
+  @override
+  Future<Result<DateTime?>> getFriendshipSince(String friendId) async {
+    final currentUserId = _userId;
+    if (currentUserId == null) return const Failed(AuthenticationFailure());
+
+    try {
+      return Success(
+        await _remote.getFriendshipSince(currentUserId, friendId),
+      );
     } on Object catch (error) {
       if (error is Failure) return Failed(error);
       return Failed(_remote.mapError(error));

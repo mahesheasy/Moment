@@ -41,6 +41,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram</string>
+		<string>snapchat</string>
+		<string>sms</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -68,6 +74,10 @@
 	<string>Moment needs camera access to capture and share moments with friends.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Moment needs photo library access to share moments from your gallery.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Moment uses your contacts to help you invite friends.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Moment sends notifications when friends share moments with you.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

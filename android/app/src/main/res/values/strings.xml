@@ -3,4 +3,6 @@
     <string name="moment_widget_description">Your latest moment from someone close.</string>
     <string name="moment_widget_loading">Moment</string>
     <string name="moment_notification_channel">Moments</string>
+    <string name="chat_notification_channel">Chats</string>
+    <string name="friend_request_notification_channel">Friend requests</string>
 </resources>

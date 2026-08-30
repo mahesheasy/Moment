@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class AppEnv {
@@ -62,8 +61,7 @@ class AppEnv {
     if (missing.isNotEmpty) {
       throw AppEnvException(
         'Missing environment values: ${missing.join(', ')}. '
-        'Copy env.json.example to env.json, or run with '
-        '--dart-define-from-file=env.json.',
+        'Copy env.json.example to env.json and rebuild.',
       );
     }
     final uri = Uri.tryParse(supabaseUrl);
@@ -88,7 +86,7 @@ class AppEnvException implements Exception {
   String toString() => 'AppEnvException: $message';
 }
 
-/// Loads env from compile-time defines first, then bundled `env.json` in debug.
+/// Loads env from compile-time defines first, then bundled `env.json`.
 class EnvLoader {
   const EnvLoader._();
 
@@ -98,11 +96,9 @@ class EnvLoader {
       return fromDefines;
     }
 
-    if (kDebugMode || kProfileMode) {
-      final fromAsset = await _loadFromAsset();
-      if (fromAsset != null && fromAsset.isConfigured) {
-        return fromAsset;
-      }
+    final fromAsset = await _loadFromAsset();
+    if (fromAsset != null && fromAsset.isConfigured) {
+      return fromAsset;
     }
 
     return fromDefines;

@@ -58,7 +58,6 @@ class CircleMemberAvatarStack extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.surfaceElevatedDark,
-                  border: Border.all(color: AppColors.borderDark, width: 1.2),
                 ),
                 child: Text(
                   '+$overflow',
@@ -88,17 +87,12 @@ class _MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatar = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.backgroundDark, width: 1.5),
-      ),
+    final avatar = ClipOval(
       child: MomentAvatar(
         name: member.profile.displayName,
         imageUrl: member.profile.avatarUrl,
-        size: size - 2,
+        size: size,
+        showBorder: false,
       ),
     );
 

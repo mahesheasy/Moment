@@ -53,7 +53,7 @@ class FriendsRemoteDataSource {
         params: {'p_limit': limit},
       );
 
-      final suggestions = (data)
+      return (data)
           .map((row) {
             final map = Map<String, dynamic>.from(row as Map);
             final profile = UserProfile(
@@ -66,9 +66,8 @@ class FriendsRemoteDataSource {
             final mutualCount = (map['mutual_count'] as num?)?.toInt() ?? 0;
             return (profile: profile, mutualCount: mutualCount);
           })
+          .where((row) => row.mutualCount > 0)
           .toList();
-
-      if (suggestions.isNotEmpty) return suggestions;
     } on Object {
       // RPC not deployed yet — fall through to discover list.
     }
@@ -176,6 +175,17 @@ class FriendsRemoteDataSource {
         .eq('id', userId)
         .single();
     return ProfileModel.fromJson(Map<String, dynamic>.from(data)).toEntity();
+  }
+
+  Future<DateTime?> getFriendshipSince(String userId, String friendId) async {
+    final data = await _client
+        .from('friendships')
+        .select('created_at')
+        .eq('user_id', userId)
+        .eq('friend_id', friendId)
+        .maybeSingle();
+    if (data == null) return null;
+    return DateTime.parse(data['created_at'] as String).toUtc();
   }
 
   Future<bool> areFriends(String userId, String otherId) async {

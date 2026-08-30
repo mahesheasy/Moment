@@ -179,6 +179,7 @@ class WidgetPreferences extends Equatable {
     this.lockScreenPrivacy = true,
     this.paused = false,
     this.privacyPersonId,
+    this.showStreak = true,
   });
 
   final WidgetTheme theme;
@@ -197,6 +198,7 @@ class WidgetPreferences extends Equatable {
   /// When set, [privacyMode] applies only to moments from this person.
   /// When null, privacy applies to everyone.
   final String? privacyPersonId;
+  final bool showStreak;
 
   /// Resolves which privacy mode to use for a moment from [senderId].
   WidgetPrivacyMode privacyForSender(String senderId) {
@@ -218,7 +220,7 @@ class WidgetPreferences extends Equatable {
       accentColor: defaultAccent,
       typography: WidgetTypography.defaultStyle,
       widgetMode: WidgetMode.latest,
-      displaySize: WidgetDisplaySize.large,
+      displaySize: WidgetDisplaySize.small,
     );
   }
 
@@ -246,6 +248,7 @@ class WidgetPreferences extends Equatable {
       lockScreenPrivacy: json['lock_screen_privacy'] as bool? ?? true,
       paused: json['paused'] as bool? ?? false,
       privacyPersonId: json['privacy_person_id'] as String?,
+      showStreak: json['show_streak'] as bool? ?? true,
     );
   }
 
@@ -265,6 +268,7 @@ class WidgetPreferences extends Equatable {
       'lock_screen_privacy': lockScreenPrivacy,
       'paused': paused,
       'privacy_person_id': privacyPersonId,
+      'show_streak': showStreak,
     };
   }
 
@@ -332,6 +336,7 @@ class WidgetPreferences extends Equatable {
       paused: local.paused,
       privacyPersonId: local.privacyPersonId,
       clearPrivacyPerson: local.privacyPersonId == null,
+      showStreak: local.showStreak,
     );
   }
 
@@ -350,6 +355,7 @@ class WidgetPreferences extends Equatable {
     bool? lockScreenPrivacy,
     bool? paused,
     String? privacyPersonId,
+    bool? showStreak,
     bool clearPerson = false,
     bool clearCircle = false,
     bool clearPrivacyPerson = false,
@@ -375,6 +381,7 @@ class WidgetPreferences extends Equatable {
       privacyPersonId: clearPrivacyPerson
           ? null
           : privacyPersonId ?? this.privacyPersonId,
+      showStreak: showStreak ?? this.showStreak,
     );
   }
 
@@ -394,6 +401,7 @@ class WidgetPreferences extends Equatable {
     lockScreenPrivacy,
     paused,
     privacyPersonId,
+    showStreak,
   ];
 }
 

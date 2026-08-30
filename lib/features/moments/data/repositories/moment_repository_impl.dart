@@ -1,5 +1,6 @@
 import 'package:moment/core/errors/failures.dart';
 import 'package:moment/core/result/result.dart';
+import 'package:moment/core/widget/moment_streak_calculator.dart';
 import 'package:moment/features/moments/data/datasources/moments_remote_data_source.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/moments/domain/repositories/moment_repository.dart';
@@ -81,11 +82,21 @@ class MomentRepositoryImpl implements MomentRepository {
                   limit: limit,
                 ),
       };
-      return Success(moments);
+      return Success(_sortWidgetMoments(moments));
     } on Object catch (error) {
       if (error is Failure) return Failed(error);
       return Failed(_remote.mapError(error));
     }
+  }
+
+  List<Moment> _sortWidgetMoments(List<Moment> moments) {
+    final sorted = List<Moment>.from(moments)
+      ..sort((a, b) {
+        final byTime = b.createdAt.compareTo(a.createdAt);
+        if (byTime != 0) return byTime;
+        return b.id.compareTo(a.id);
+      });
+    return sorted;
   }
 
   Future<List<Moment>> _listCircleWidgetMoments({
@@ -132,6 +143,28 @@ class MomentRepositoryImpl implements MomentRepository {
           limit: limit,
           offset: offset,
           seenFilter: seenFilter,
+        ),
+      );
+    } on Object catch (error) {
+      if (error is Failure) return Failed(error);
+      return Failed(_remote.mapError(error));
+    }
+  }
+
+  @override
+  Future<Result<List<Moment>>> listSentMoments({
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final userId = _userIdProvider();
+    if (userId == null) return const Failed(AuthenticationFailure());
+
+    try {
+      return Success(
+        await _remote.listSentMoments(
+          userId: userId,
+          limit: limit,
+          offset: offset,
         ),
       );
     } on Object catch (error) {
@@ -214,6 +247,20 @@ class MomentRepositoryImpl implements MomentRepository {
     try {
       await _remote.deleteSentMoment(momentId: momentId, senderId: userId);
       return const Success(null);
+    } on Object catch (error) {
+      if (error is Failure) return Failed(error);
+      return Failed(_remote.mapError(error));
+    }
+  }
+
+  @override
+  Future<Result<int>> getMomentStreak() async {
+    final userId = _userIdProvider();
+    if (userId == null) return const Failed(AuthenticationFailure());
+
+    try {
+      final timestamps = await _remote.listActivityTimestamps(userId);
+      return Success(calculateMomentStreak(timestamps));
     } on Object catch (error) {
       if (error is Failure) return Failed(error);
       return Failed(_remote.mapError(error));

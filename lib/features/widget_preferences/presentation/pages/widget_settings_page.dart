@@ -58,7 +58,10 @@ class _WidgetSettingsViewState extends State<_WidgetSettingsView> {
 
     if (Platform.isAndroid) {
       final pinned = await sl<AndroidWidgetBridge>().requestPinToHomeScreen();
-      if (pinned) await sl<HomeWidgetSyncService>().sync();
+      if (pinned) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (mounted) await sl<HomeWidgetSyncService>().sync();
+      }
       if (!mounted) return;
       setState(() => _isPinning = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +160,42 @@ class _WidgetSettingsViewState extends State<_WidgetSettingsView> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             children: [
+              SettingsSection(
+                title: 'Widget setup',
+                children: [
+                  SettingsNavRow(
+                    label: 'Add the widget',
+                    onTap: _previewOnHomeScreen,
+                  ),
+                  SettingsNavRow(
+                    label: 'How to add the widget',
+                    onTap: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Add Moment to your home screen'),
+                          content: const Text(
+                            'Long-press your home screen, tap Widgets, find Moment, '
+                            'then drag the 2×2 widget where you want it.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(dialogContext).pop(),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  SettingsToggleRow(
+                    label: 'Streak on widget',
+                    value: draft.showStreak,
+                    onChanged: cubit.setShowStreak,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               Text(
                 'Customize how your moments appear',
                 style: SettingsType.body(AppColors.textSecondaryDark),
@@ -166,9 +205,17 @@ class _WidgetSettingsViewState extends State<_WidgetSettingsView> {
               Center(
                 child: WidgetStylePreview(
                   preferences: draft,
+                  stackMoments: state.previewStackMoments.isEmpty
+                      ? null
+                      : state.previewStackMoments,
                   headerTitle: previewTitle,
+                  relativeTime: state.previewStackMoments.isNotEmpty
+                      ? state.previewStackMoments.first.relativeTime
+                      : 'Just now',
                   borderless: true,
-                  previewSize: 220,
+                  locketPreview: true,
+                  streakCount: state.previewStreakCount,
+                  previewSize: 160,
                 ),
               ),
               const SizedBox(height: 32),

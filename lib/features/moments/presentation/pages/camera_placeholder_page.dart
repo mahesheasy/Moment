@@ -1,18 +1,12 @@
-import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:moment/app/di/injection.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
-import 'package:moment/core/theme/app_radius.dart';
 import 'package:moment/core/theme/app_spacing.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
-import 'package:moment/features/moments/presentation/pages/camera_preview_page.dart';
+import 'package:moment/features/moments/presentation/widgets/live_camera_host.dart';
 import 'package:moment/features/prompts/domain/entities/camera_prompt_context.dart';
 
 class CameraPlaceholderPage extends StatelessWidget {
@@ -29,245 +23,8 @@ class CameraPlaceholderPage extends StatelessWidget {
   }
 }
 
-class _CameraCaptureView extends StatefulWidget {
+class _CameraCaptureView extends StatelessWidget {
   const _CameraCaptureView();
-
-  @override
-  State<_CameraCaptureView> createState() => _CameraCaptureViewState();
-}
-
-class _CameraCaptureViewState extends State<_CameraCaptureView>
-    with WidgetsBindingObserver {
-  CameraController? _controller;
-  List<CameraDescription> _cameras = const [];
-  var _bindGeneration = 0;
-  var _initializing = true;
-  var _capturing = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _openCamera();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _releaseController();
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _releaseController();
-    } else if (state == AppLifecycleState.resumed) {
-      final controller = _controller;
-      if (controller == null || !controller.value.isInitialized) {
-        _openCamera();
-      }
-    }
-  }
-
-  Future<void> _disposeQuietly(CameraController controller) async {
-    try {
-      await controller.dispose();
-    } on Object {
-      // Camera plugin channels can already be gone during hot restart
-      // or Android activity teardown.
-    }
-  }
-
-  Future<void> _releaseController() async {
-    _bindGeneration++;
-    final controller = _controller;
-    _controller = null;
-    if (controller != null) {
-      await _disposeQuietly(controller);
-    }
-  }
-
-  Future<void> _openCamera() async {
-    if (kIsWeb) {
-      setState(() => _initializing = false);
-      return;
-    }
-
-    setState(() {
-      _initializing = true;
-      _error = null;
-    });
-
-    try {
-      _cameras = await availableCameras();
-      if (_cameras.isEmpty) {
-        setState(() {
-          _initializing = false;
-          _error = 'No camera found on this device.';
-        });
-        return;
-      }
-      if (!mounted) return;
-      await _bindCamera(context.read<CameraCubit>().state.useFrontCamera);
-    } on CameraException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _initializing = false;
-        _error = error.description ?? 'Camera access is required.';
-      });
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _initializing = false;
-        _error = 'Could not start camera: $error';
-      });
-    }
-  }
-
-  Future<void> _bindCamera(bool useFront) async {
-    final generation = ++_bindGeneration;
-    final lens = useFront
-        ? CameraLensDirection.front
-        : CameraLensDirection.back;
-    final description = _cameras.firstWhere(
-      (camera) => camera.lensDirection == lens,
-      orElse: () => _cameras.first,
-    );
-
-    final previous = _controller;
-    _controller = null;
-    if (previous != null) {
-      try {
-        await previous.dispose();
-      } on Object {
-        // Ignore stale plugin channels from a previous session.
-      }
-    }
-    if (!mounted || generation != _bindGeneration) return;
-
-    final next = CameraController(
-      description,
-      ResolutionPreset.medium,
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
-    );
-    try {
-      await next.initialize();
-      if (!mounted || generation != _bindGeneration) {
-        await _disposeQuietly(next);
-        return;
-      }
-      await next.lockCaptureOrientation(DeviceOrientation.portraitUp);
-      if (!mounted || generation != _bindGeneration) {
-        await _disposeQuietly(next);
-        return;
-      }
-
-      final flashOn = context.read<CameraCubit>().state.flashEnabled;
-      if (next.description.lensDirection == CameraLensDirection.back) {
-        await next.setFlashMode(flashOn ? FlashMode.auto : FlashMode.off);
-      }
-      if (!mounted || generation != _bindGeneration) {
-        await _disposeQuietly(next);
-        return;
-      }
-      _controller = next;
-      setState(() => _initializing = false);
-    } on Object {
-      await _disposeQuietly(next);
-      rethrow;
-    }
-  }
-
-  Future<void> _capture() async {
-    final controller = _controller;
-    if (controller == null ||
-        !controller.value.isInitialized ||
-        _capturing ||
-        !mounted) {
-      if (kIsWeb) {
-        await _pickImage(ImageSource.gallery);
-      }
-      return;
-    }
-
-    setState(() => _capturing = true);
-    try {
-      final file = await controller.takePicture();
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      _openPreview(Uint8List.fromList(bytes), 'image/jpeg');
-    } on CameraException catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.description ?? 'Could not capture.')),
-      );
-    } finally {
-      if (mounted) setState(() => _capturing = false);
-    }
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final file = await ImagePicker().pickImage(
-        source: source,
-        imageQuality: 85,
-      );
-      if (file == null || !mounted) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      _openPreview(
-        Uint8List.fromList(bytes),
-        file.mimeType ?? 'image/jpeg',
-      );
-    } on PlatformException catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error.message?.isNotEmpty == true
-                ? error.message!
-                : 'Photos access is required. Enable it in Settings.',
-          ),
-        ),
-      );
-    }
-  }
-
-  void _openPreview(Uint8List bytes, String mimeType) {
-    final cubit = context.read<CameraCubit>();
-    cubit.setPreview(bytes: bytes, mimeType: mimeType);
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => BlocProvider.value(
-          value: cubit,
-          child: const CameraPreviewPage(),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _flip() async {
-    if (_cameras.length < 2 || _initializing) return;
-    final cubit = context.read<CameraCubit>();
-    cubit.toggleCameraFacing();
-    setState(() => _initializing = true);
-    await _bindCamera(cubit.state.useFrontCamera);
-  }
-
-  Future<void> _toggleFlash() async {
-    final cubit = context.read<CameraCubit>();
-    cubit.toggleFlash();
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-    await controller.setFlashMode(
-      cubit.state.flashEnabled ? FlashMode.auto : FlashMode.off,
-    );
-    if (mounted) setState(() {});
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -280,23 +37,21 @@ class _CameraCaptureViewState extends State<_CameraCaptureView>
           ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
         }
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  0,
-                ),
-                child: BlocBuilder<CameraCubit, CameraState>(
-                  buildWhen: (previous, current) =>
-                      previous.flashEnabled != current.flashEnabled,
-                  builder: (context, state) {
-                    return Row(
+      child: LiveCameraHost(
+        builder: (context, session) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      0,
+                    ),
+                    child: Row(
                       children: [
                         _RoundIconButton(
                           icon: AppIcons.close,
@@ -308,90 +63,40 @@ class _CameraCaptureViewState extends State<_CameraCaptureView>
                             }
                           },
                         ),
-                        Spacer(),
+                        const Spacer(),
                         _RoundIconButton(
-                          icon: state.flashEnabled
+                          icon: session.flashEnabled
                               ? AppIcons.flash
                               : AppIcons.flashOff,
-                          onTap: _toggleFlash,
+                          onTap: session.toggleFlash,
                         ),
                       ],
-                    );
-                  },
-                ),
-              ),
-              SizedBox(height: AppSpacing.md),
-              Expanded(child: _viewfinder()),
-              SizedBox(height: AppSpacing.xl),
-              _CaptureBar(
-                onGallery: () => _pickImage(ImageSource.gallery),
-                onCapture: _capture,
-                onFlip: _flip,
-                capturing: _capturing,
-              ),
-              SizedBox(height: AppSpacing.lg),
-              const _ModeSelector(),
-              SizedBox(height: AppSpacing.md),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _viewfinder() {
-    final controller = _controller;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      child: ClipRRect(
-        borderRadius: AppRadius.xxxlAll,
-        child: ColoredBox(
-          color: AppColors.surfaceDark,
-          child: SizedBox.expand(
-            child: _initializing
-                ? Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
-                : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          SizedBox(height: AppSpacing.md),
-                          TextButton(
-                            onPressed: _openCamera,
-                            child: Text('Try again'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : controller != null && controller.value.isInitialized
-                ? FittedBox(
-                    fit: BoxFit.cover,
-                    clipBehavior: Clip.hardEdge,
-                    child: SizedBox(
-                      width: controller.value.previewSize?.height ?? 1,
-                      height: controller.value.previewSize?.width ?? 1,
-                      child: CameraPreview(controller),
-                    ),
-                  )
-                : Center(
-                    child: Icon(
-                      AppIcons.camera,
-                      size: 56,
-                      color: AppColors.textTertiaryDark,
                     ),
                   ),
-          ),
-        ),
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                      ),
+                      child: session.viewfinder,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  _CaptureBar(
+                    onGallery: session.pickGallery,
+                    onCapture: session.capture,
+                    onFlip: session.flip,
+                    capturing: session.capturing,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  const _ModeSelector(),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -432,7 +137,7 @@ class _CaptureBar extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 5),
               ),
               child: capturing
-                  ? Padding(
+                  ? const Padding(
                       padding: EdgeInsets.all(22),
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
@@ -481,7 +186,7 @@ class _ModeSelector extends StatelessWidget {
         GestureDetector(
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Video is coming soon.')),
+              const SnackBar(content: Text('Video is coming soon.')),
             );
           },
           child: Text(
@@ -524,7 +229,7 @@ class _LabeledRoundButton extends StatelessWidget {
             ),
             child: Icon(icon, color: Colors.white, size: 22),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(

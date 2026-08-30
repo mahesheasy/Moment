@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
@@ -16,6 +15,7 @@ import 'package:moment/core/widgets/moment_sheet_dialog.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/friends/presentation/cubit/friends_cubit.dart';
+import 'package:moment/features/friends/presentation/widgets/friends_discovery.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
 enum _FriendsTab { all, requests, suggested }
@@ -50,6 +50,7 @@ class _FriendsViewState extends State<_FriendsView> {
   _FriendsTab _tab = _FriendsTab.all;
   _FriendsSort _sort = _FriendsSort.nameAsc;
   _FriendsFilter _filter = _FriendsFilter.all;
+  var _showUsernameTip = true;
 
   String get _sortLabel => switch (_sort) {
     _FriendsSort.nameAsc => 'A to Z',
@@ -89,8 +90,9 @@ class _FriendsViewState extends State<_FriendsView> {
             children: [
               Text(
                 'Filter',
-                style: SettingsType.title(AppColors.textPrimaryDark)
-                    .copyWith(fontWeight: FontWeight.w600),
+                style: SettingsType.title(
+                  AppColors.textPrimaryDark,
+                ).copyWith(fontWeight: FontWeight.w600),
               ),
               SizedBox(height: AppSpacing.md),
               _FilterOption(
@@ -140,15 +142,15 @@ class _FriendsViewState extends State<_FriendsView> {
     return BlocConsumer<FriendsCubit, FriendsState>(
       listener: (context, state) {
         if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.errorMessage!)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           context.read<FriendsCubit>().clearMessages();
         }
         if (state.actionMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.actionMessage!)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.actionMessage!)));
           context.read<FriendsCubit>().clearMessages();
         }
       },
@@ -165,11 +167,11 @@ class _FriendsViewState extends State<_FriendsView> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const _FriendsHeader(),
+                      _FriendsHeader(friendCount: state.friends.length),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(
                           AppSpacing.lg,
-                          AppSpacing.md,
+                          AppSpacing.xl,
                           AppSpacing.lg,
                           0,
                         ),
@@ -207,11 +209,16 @@ class _FriendsViewState extends State<_FriendsView> {
                                   sort: _sort,
                                   filter: _filter,
                                   sortLabel: _sortLabel,
+                                  showUsernameTip: _showUsernameTip,
+                                  onDismissTip: () =>
+                                      setState(() => _showUsernameTip = false),
                                   onToggleSort: _cycleSort,
-                                  onSeeAllSuggested: () =>
-                                      setState(() => _tab = _FriendsTab.suggested),
-                                  onSeeAllRequests: () =>
-                                      setState(() => _tab = _FriendsTab.requests),
+                                  onSeeAllSuggested: () => setState(
+                                    () => _tab = _FriendsTab.suggested,
+                                  ),
+                                  onSeeAllRequests: () => setState(
+                                    () => _tab = _FriendsTab.requests,
+                                  ),
                                 ),
                         ),
                       ),
@@ -225,11 +232,16 @@ class _FriendsViewState extends State<_FriendsView> {
 }
 
 class _FriendsHeader extends StatelessWidget {
-  const _FriendsHeader();
+  const _FriendsHeader({required this.friendCount});
+
+  final int friendCount;
 
   @override
   Widget build(BuildContext context) {
     final canPop = context.canPop();
+    final subtitle = friendCount >= kFriendsGoalCount
+        ? '$friendCount friends added'
+        : '$friendCount out of $kFriendsGoalCount friends added';
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -239,53 +251,44 @@ class _FriendsHeader extends StatelessWidget {
         0,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (canPop)
-            IconButton(
-              onPressed: () => context.pop(),
-              icon: Icon(AppIcons.back, color: Colors.white, size: 18),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
-          Text(
-            'Friends',
-            style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
-            ),
-          ),
-          SizedBox(height: 4),
-          RichText(
-            text: TextSpan(
-              style: SettingsType.body(AppColors.textTertiaryDark),
+          SizedBox(
+            height: 32,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                const TextSpan(text: 'Your '),
-                TextSpan(
-                  text: 'people',
-                  style: TextStyle(
-                    foreground: Paint()
-                      ..shader = AppColors.bloomGradient.createShader(
-                        const Rect.fromLTWH(0, 0, 80, 20),
+                if (canPop)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => context.pop(),
+                      icon: Icon(AppIcons.back, color: Colors.white, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
                       ),
-                    fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const TextSpan(text: '. Your '),
-                TextSpan(
-                  text: 'moments',
-                  style: TextStyle(
-                    foreground: Paint()
-                      ..shader = AppColors.bloomGradient.createShader(
-                        const Rect.fromLTWH(0, 0, 100, 20),
-                      ),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const TextSpan(text: '.'),
               ],
             ),
+          ),
+          Text(
+            'Your Friends',
+            textAlign: TextAlign.center,
+            style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.6,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: SettingsType.body(
+              AppColors.textTertiaryDark,
+            ).copyWith(fontSize: 13),
           ),
         ],
       ),
@@ -314,7 +317,7 @@ class _FriendsSearchField extends StatelessWidget {
       onChanged: onChanged,
       style: SettingsType.body(AppColors.textPrimaryDark),
       decoration: InputDecoration(
-        hintText: 'Search friends or find people',
+        hintText: 'Add a new friend',
         hintStyle: SettingsType.body(AppColors.textTertiaryDark),
         prefixIcon: Icon(
           AppIcons.search,
@@ -323,27 +326,25 @@ class _FriendsSearchField extends StatelessWidget {
         ),
         suffixIcon: IconButton(
           onPressed: onFilterTap,
-          icon: Icon(
-            Icons.tune_rounded,
-            color: AppColors.violet,
-            size: 20,
-          ),
+          icon: Icon(Icons.tune_rounded, color: AppColors.violet, size: 20),
           splashRadius: 20,
         ),
         filled: true,
-        fillColor: AppColors.surfaceDark,
+        fillColor: AppColors.surfaceElevatedDark,
         contentPadding: const EdgeInsets.symmetric(vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.borderDark),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.borderDark),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.violet.withValues(alpha: 0.6)),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: AppColors.violet.withValues(alpha: 0.6),
+          ),
         ),
       ),
     );
@@ -420,7 +421,9 @@ class _TabItem extends StatelessWidget {
                   Icon(
                     trailingIcon,
                     size: 12,
-                    color: selected ? AppColors.violet : AppColors.textTertiaryDark,
+                    color: selected
+                        ? AppColors.violet
+                        : AppColors.textTertiaryDark,
                   ),
                   SizedBox(width: 4),
                 ],
@@ -429,25 +432,34 @@ class _TabItem extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: SettingsType.caption(
-                      selected ? AppColors.textPrimaryDark : AppColors.textTertiaryDark,
-                    ).copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500),
+                    style:
+                        SettingsType.caption(
+                          selected
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textTertiaryDark,
+                        ).copyWith(
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
                   ),
                 ),
                 if (badge != null) ...[
                   SizedBox(width: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.violet,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       '$badge',
-                      style: SettingsType.caption(Colors.white).copyWith(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: SettingsType.caption(
+                        Colors.white,
+                      ).copyWith(fontSize: 9, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -478,6 +490,8 @@ class _TabBody extends StatelessWidget {
     required this.sort,
     required this.filter,
     required this.sortLabel,
+    required this.showUsernameTip,
+    required this.onDismissTip,
     required this.onToggleSort,
     required this.onSeeAllSuggested,
     required this.onSeeAllRequests,
@@ -488,6 +502,8 @@ class _TabBody extends StatelessWidget {
   final _FriendsSort sort;
   final _FriendsFilter filter;
   final String sortLabel;
+  final bool showUsernameTip;
+  final VoidCallback onDismissTip;
   final VoidCallback onToggleSort;
   final VoidCallback onSeeAllSuggested;
   final VoidCallback onSeeAllRequests;
@@ -496,14 +512,16 @@ class _TabBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (tab) {
       _FriendsTab.all => _AllFriendsTab(
-          state: state,
-          sort: sort,
-          filter: filter,
-          sortLabel: sortLabel,
-          onToggleSort: onToggleSort,
-          onSeeAllSuggested: onSeeAllSuggested,
-          onSeeAllRequests: onSeeAllRequests,
-        ),
+        state: state,
+        sort: sort,
+        filter: filter,
+        sortLabel: sortLabel,
+        showUsernameTip: showUsernameTip,
+        onDismissTip: onDismissTip,
+        onToggleSort: onToggleSort,
+        onSeeAllSuggested: onSeeAllSuggested,
+        onSeeAllRequests: onSeeAllRequests,
+      ),
       _FriendsTab.requests => _RequestsTab(state: state),
       _FriendsTab.suggested => _SuggestedTab(state: state),
     };
@@ -516,6 +534,8 @@ class _AllFriendsTab extends StatelessWidget {
     required this.sort,
     required this.filter,
     required this.sortLabel,
+    required this.showUsernameTip,
+    required this.onDismissTip,
     required this.onToggleSort,
     required this.onSeeAllSuggested,
     required this.onSeeAllRequests,
@@ -525,6 +545,8 @@ class _AllFriendsTab extends StatelessWidget {
   final _FriendsSort sort;
   final _FriendsFilter filter;
   final String sortLabel;
+  final bool showUsernameTip;
+  final VoidCallback onDismissTip;
   final VoidCallback onToggleSort;
   final VoidCallback onSeeAllSuggested;
   final VoidCallback onSeeAllRequests;
@@ -532,6 +554,7 @@ class _AllFriendsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final friends = _filteredAndSortedFriends(state.friends, sort, filter);
+    final username = state.myUsername;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -541,23 +564,10 @@ class _AllFriendsTab extends StatelessWidget {
         AppSpacing.huge,
       ),
       children: [
-        if (state.suggestions.isNotEmpty) ...[
-          _SectionTitle(
-            title: 'Suggested for you',
-            showSeeAll: true,
-            onSeeAllTap: onSeeAllSuggested,
-          ),
-          SizedBox(height: AppSpacing.md),
-          SizedBox(
-            height: 108,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: state.suggestions.length,
-              separatorBuilder: (_, _) => SizedBox(width: 16),
-              itemBuilder: (context, i) =>
-                  _SuggestedTile(suggestion: state.suggestions[i]),
-            ),
-          ),
+        FriendsFromOtherAppsRow(username: username),
+        SizedBox(height: AppSpacing.xl),
+        if (showUsernameTip && username != null && username.isNotEmpty) ...[
+          FriendsUsernameTipCard(username: username, onDismiss: onDismissTip),
           SizedBox(height: AppSpacing.xxl),
         ],
         if (state.incoming.isNotEmpty) ...[
@@ -567,16 +577,34 @@ class _AllFriendsTab extends StatelessWidget {
             onSeeAllTap: onSeeAllRequests,
           ),
           SizedBox(height: AppSpacing.sm),
-          ...state.incoming.take(3).map(
-            (r) => _IncomingRequestRow(request: r),
-          ),
+          ...state.incoming.take(3).map((r) => _IncomingRequestRow(request: r)),
           SizedBox(height: AppSpacing.xxl),
         ],
+        if (state.suggestions.isNotEmpty) ...[
+          _SectionTitle(
+            title: 'Suggestions',
+            showSeeAll: state.suggestions.length > 4,
+            onSeeAllTap: onSeeAllSuggested,
+          ),
+          SizedBox(height: AppSpacing.sm),
+          ...state.suggestions
+              .take(8)
+              .map((s) => _SuggestedListRow(suggestion: s)),
+          SizedBox(height: AppSpacing.xxl),
+        ],
+        FriendsContactsSection(
+          contacts: state.contacts,
+          contactsLoaded: state.contactsLoaded,
+          permissionDenied: state.contactsPermissionDenied,
+          username: username,
+          onRequestAccess: () => context.read<FriendsCubit>().loadContacts(),
+        ),
+        if (state.contacts.isNotEmpty) SizedBox(height: AppSpacing.xxl),
         _SectionTitle(
           title: 'Your friends',
-          trailing: 'Sort by: $sortLabel',
-          onTrailingTap: onToggleSort,
-          trailingIcon: Icons.swap_vert_rounded,
+          trailing: friends.isEmpty ? null : 'Sort by: $sortLabel',
+          onTrailingTap: friends.isEmpty ? null : onToggleSort,
+          trailingIcon: friends.isEmpty ? null : Icons.swap_vert_rounded,
         ),
         SizedBox(height: AppSpacing.sm),
         if (friends.isEmpty)
@@ -655,9 +683,8 @@ class _SuggestedTab extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       itemCount: state.suggestions.length,
       separatorBuilder: (_, _) => SizedBox(height: 4),
-      itemBuilder: (context, i) => _SuggestedListRow(
-        suggestion: state.suggestions[i],
-      ),
+      itemBuilder: (context, i) =>
+          _SuggestedListRow(suggestion: state.suggestions[i]),
     );
   }
 }
@@ -723,10 +750,9 @@ class _SectionTitle extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-            ),
+            style: SettingsType.title(
+              AppColors.textPrimaryDark,
+            ).copyWith(fontWeight: FontWeight.w600, fontSize: 15),
           ),
         ),
         if (showSeeAll)
@@ -737,8 +763,9 @@ class _SectionTitle extends StatelessWidget {
               children: [
                 Text(
                   'See all',
-                  style: SettingsType.caption(AppColors.violet)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: SettingsType.caption(
+                    AppColors.violet,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 Icon(AppIcons.chevronRight, size: 14, color: AppColors.violet),
               ],
@@ -752,8 +779,9 @@ class _SectionTitle extends StatelessWidget {
               children: [
                 Text(
                   trailing!,
-                  style: SettingsType.caption(AppColors.violet)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: SettingsType.caption(
+                    AppColors.violet,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (trailingIcon != null) ...[
                   SizedBox(width: 2),
@@ -763,85 +791,6 @@ class _SectionTitle extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _SuggestedTile extends StatelessWidget {
-  const _SuggestedTile({required this.suggestion});
-
-  final SuggestedFriend suggestion;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FriendsCubit, FriendsState>(
-      buildWhen: (prev, next) =>
-          prev.actingOn != next.actingOn ||
-          prev.suggestions != next.suggestions,
-      builder: (context, state) {
-        final cubit = context.read<FriendsCubit>();
-        final profile = suggestion.profile;
-        final mutual = suggestion.mutualFriendCount;
-        final isSent = suggestion.relationship == FriendRelationship.requestSent;
-        final canAdd = suggestion.relationship == FriendRelationship.none;
-        final isSending = state.isActingOn('send:${profile.id}');
-        final requestId = suggestion.pendingRequestId;
-        final isCanceling =
-            requestId != null && state.isActingOn('cancel:$requestId');
-
-        return SizedBox(
-          width: 72,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  MomentAvatar(
-                    name: profile.displayName,
-                    imageUrl: profile.avatarUrl,
-                    size: 52,
-                  ),
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: _SuggestionActionBadge(
-                      isLoading: isSending || isCanceling,
-                      isSent: isSent,
-                      onTap: () {
-                        if (isSending || isCanceling) return;
-                        if (canAdd) {
-                          cubit.sendRequest(profile.id);
-                        } else if (isSent && requestId != null) {
-                          cubit.cancelRequest(requestId);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 6),
-              Text(
-                profile.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: SettingsType.caption(AppColors.textPrimaryDark)
-                    .copyWith(fontWeight: FontWeight.w600, fontSize: 12),
-              ),
-              Text(
-                mutual > 0 ? '$mutual mutual' : 'Suggested',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: SettingsType.caption(AppColors.textTertiaryDark)
-                    .copyWith(fontSize: 10),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -861,7 +810,8 @@ class _SuggestedListRow extends StatelessWidget {
         final cubit = context.read<FriendsCubit>();
         final profile = suggestion.profile;
         final mutual = suggestion.mutualFriendCount;
-        final isSent = suggestion.relationship == FriendRelationship.requestSent;
+        final isSent =
+            suggestion.relationship == FriendRelationship.requestSent;
         final canAdd = suggestion.relationship == FriendRelationship.none;
         final isSending = state.isActingOn('send:${profile.id}');
         final requestId = suggestion.pendingRequestId;
@@ -869,34 +819,13 @@ class _SuggestedListRow extends StatelessWidget {
             requestId != null && state.isActingOn('cancel:$requestId');
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  MomentAvatar(
-                    name: profile.displayName,
-                    imageUrl: profile.avatarUrl,
-                    size: 44,
-                  ),
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: _SuggestionActionBadge(
-                      isLoading: isSending || isCanceling,
-                      isSent: isSent,
-                      onTap: () {
-                        if (isSending || isCanceling) return;
-                        if (canAdd) {
-                          cubit.sendRequest(profile.id);
-                        } else if (isSent && requestId != null) {
-                          cubit.cancelRequest(requestId);
-                        }
-                      },
-                    ),
-                  ),
-                ],
+              MomentAvatar(
+                name: profile.displayName,
+                imageUrl: profile.avatarUrl,
+                size: 48,
               ),
               SizedBox(width: AppSpacing.md),
               Expanded(
@@ -905,31 +834,33 @@ class _SuggestedListRow extends StatelessWidget {
                   children: [
                     Text(
                       profile.displayName,
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: SettingsType.title(
+                        AppColors.textPrimaryDark,
+                      ).copyWith(fontWeight: FontWeight.w600, fontSize: 15),
                     ),
                     Text(
                       mutual > 0
                           ? '$mutual mutual friends'
-                          : 'Suggested for you',
-                      style: SettingsType.caption(AppColors.textTertiaryDark),
+                          : '@${profile.username}',
+                      style: SettingsType.caption(
+                        AppColors.textTertiaryDark,
+                      ).copyWith(fontSize: 11),
                     ),
                   ],
                 ),
               ),
               if (isSent)
-                _GradientPillButton(
-                  label: 'Cancel',
-                  compact: true,
+                FriendAddPillButton(
+                  label: 'Pending',
+                  emphasized: false,
                   isLoading: isCanceling,
                   onTap: requestId == null
                       ? null
                       : () => cubit.cancelRequest(requestId),
                 )
               else if (canAdd)
-                _GradientPillButton(
-                  label: 'Add',
-                  compact: true,
+                FriendAddPillButton(
+                  label: '+ Add',
                   isLoading: isSending,
                   onTap: () => cubit.sendRequest(profile.id),
                 ),
@@ -937,47 +868,6 @@ class _SuggestedListRow extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _SuggestionActionBadge extends StatelessWidget {
-  const _SuggestionActionBadge({
-    required this.isLoading,
-    required this.isSent,
-    required this.onTap,
-  });
-
-  final bool isLoading;
-  final bool isSent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          color: isSent ? AppColors.surfaceElevatedDark : AppColors.violet,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.backgroundDark, width: 2),
-        ),
-        child: isLoading
-            ? Padding(
-                padding: EdgeInsets.all(4),
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Icon(
-                isSent ? Icons.close_rounded : Icons.person_add_alt_1_rounded,
-                size: 12,
-                color: isSent ? AppColors.textSecondaryDark : Colors.white,
-              ),
-      ),
     );
   }
 }
@@ -1013,8 +903,9 @@ class _IncomingRequestRow extends StatelessWidget {
                   children: [
                     Text(
                       sender.displayName,
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: SettingsType.title(
+                        AppColors.textPrimaryDark,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                     Text(
                       '@${sender.username} · ${relativeTimeAgo(request.createdAt)}',
@@ -1076,8 +967,9 @@ class _OutgoingRequestRow extends StatelessWidget {
                   children: [
                     Text(
                       receiver.displayName,
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: SettingsType.title(
+                        AppColors.textPrimaryDark,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                     Text(
                       'Pending · ${relativeTimeAgo(request.createdAt)}',
@@ -1092,7 +984,9 @@ class _OutgoingRequestRow extends StatelessWidget {
                 isLoading: isCanceling,
                 onTap: isCanceling
                     ? null
-                    : () => context.read<FriendsCubit>().cancelRequest(request.id),
+                    : () => context.read<FriendsCubit>().cancelRequest(
+                        request.id,
+                      ),
               ),
             ],
           ),
@@ -1141,12 +1035,15 @@ class _FriendListRow extends StatelessWidget {
                       children: [
                         Text(
                           profile.displayName,
-                          style: SettingsType.title(AppColors.textPrimaryDark)
-                              .copyWith(fontWeight: FontWeight.w600),
+                          style: SettingsType.title(
+                            AppColors.textPrimaryDark,
+                          ).copyWith(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           '@${profile.username}',
-                          style: SettingsType.caption(AppColors.textTertiaryDark),
+                          style: SettingsType.caption(
+                            AppColors.textTertiaryDark,
+                          ),
                         ),
                       ],
                     ),
@@ -1243,8 +1140,9 @@ class _FriendListRow extends StatelessWidget {
                 children: [
                   Text(
                     'Report user',
-                    style: SettingsType.title(AppColors.textPrimaryDark)
-                        .copyWith(fontWeight: FontWeight.w600),
+                    style: SettingsType.title(
+                      AppColors.textPrimaryDark,
+                    ).copyWith(fontWeight: FontWeight.w600),
                   ),
                   SizedBox(height: AppSpacing.md),
                   ...reasons.map(
@@ -1269,7 +1167,9 @@ class _FriendListRow extends StatelessWidget {
                     style: SettingsType.body(AppColors.textPrimaryDark),
                     decoration: InputDecoration(
                       labelText: 'Details (optional)',
-                      labelStyle: SettingsType.caption(AppColors.textTertiaryDark),
+                      labelStyle: SettingsType.caption(
+                        AppColors.textTertiaryDark,
+                      ),
                       filled: true,
                       fillColor: AppColors.surfaceElevatedDark,
                       border: OutlineInputBorder(
@@ -1353,8 +1253,9 @@ class _FriendListRow extends StatelessWidget {
                   children: [
                     Text(
                       profile.displayName,
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: SettingsType.title(
+                        AppColors.textPrimaryDark,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                     Text(
                       '@${profile.username}',
@@ -1422,9 +1323,11 @@ class _SearchResultRow extends StatelessWidget {
         final cubit = context.read<FriendsCubit>();
         final r = result;
         final isSending = state.isActingOn('send:${r.profile.id}');
-        final isCanceling = r.pendingRequestId != null &&
+        final isCanceling =
+            r.pendingRequestId != null &&
             state.isActingOn('cancel:${r.pendingRequestId}');
-        final isAccepting = r.pendingRequestId != null &&
+        final isAccepting =
+            r.pendingRequestId != null &&
             state.isActingOn('accept:${r.pendingRequestId}');
 
         return Padding(
@@ -1443,8 +1346,9 @@ class _SearchResultRow extends StatelessWidget {
                   children: [
                     Text(
                       r.profile.displayName,
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: SettingsType.title(
+                        AppColors.textPrimaryDark,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                     Text(
                       r.mutualFriendCount > 0
@@ -1456,15 +1360,14 @@ class _SearchResultRow extends StatelessWidget {
                 ),
               ),
               switch (r.relationship) {
-                FriendRelationship.none => _GradientPillButton(
-                  label: 'Add',
-                  compact: true,
+                FriendRelationship.none => FriendAddPillButton(
+                  label: '+ Add',
                   isLoading: isSending,
                   onTap: () => cubit.sendRequest(r.profile.id),
                 ),
-                FriendRelationship.requestSent => _GradientPillButton(
-                  label: 'Cancel',
-                  compact: true,
+                FriendRelationship.requestSent => FriendAddPillButton(
+                  label: 'Pending',
+                  emphasized: false,
                   isLoading: isCanceling,
                   onTap: r.pendingRequestId == null
                       ? null

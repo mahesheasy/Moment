@@ -25,7 +25,11 @@ class HomeWidgetSyncService {
   final CircleRepository _circles;
   final WidgetPreferencesLocalCache _localCache;
 
-  Future<void> sync() async {
+  static int _syncGeneration = 0;
+
+  Future<void> sync({bool promoteLatest = false}) async {
+    final generation = ++_syncGeneration;
+
     final prefsResult = await _widgetPreferences.getPreferences();
     final remote = switch (prefsResult) {
       Success(:final value) =>
@@ -37,11 +41,24 @@ class HomeWidgetSyncService {
     };
     final local =
         await _localCache.read() ?? await _widgetBridge.readLocalPreferences();
+    if (generation != _syncGeneration) return;
+
     final preferences = local == null ? remote : remote.mergeLocal(local);
 
-    await _widgetBridge.syncPreferences(preferences);
+    final streakCount = switch (await _moments.getMomentStreak()) {
+      Success(:final value) => value,
+      Failed() => 0,
+    };
+    if (generation != _syncGeneration) return;
+
+    await _widgetBridge.syncPreferences(
+      preferences,
+      streakCount: streakCount,
+    );
 
     final momentsResult = await _moments.getWidgetMoments(preferences);
+    if (generation != _syncGeneration) return;
+
     switch (momentsResult) {
       case Success(:final value) when value.isNotEmpty:
         final titles = <String, String>{};
@@ -53,16 +70,24 @@ class HomeWidgetSyncService {
           );
           titles[moment.id] = display.headerTitle;
         }
+        if (generation != _syncGeneration) return;
         await _widgetBridge.syncReceivedMoments(
           moments: value,
           preferences: preferences,
           headerTitles: titles,
           headerEmoji: preferences.theme.emoji,
+          showLatest: promoteLatest,
+          syncGeneration: generation,
         );
       case Success():
         final fallback = await _moments.getWidgetMoment(preferences);
+        if (generation != _syncGeneration) return;
         if (fallback case Success(:final value?)) {
-          await pushMoment(moment: value, preferences: preferences);
+          await pushMoment(
+            moment: value,
+            preferences: preferences,
+            syncGeneration: generation,
+          );
         }
       case Failed():
         break;
@@ -72,6 +97,7 @@ class HomeWidgetSyncService {
   Future<void> pushMoment({
     required Moment moment,
     required WidgetPreferences preferences,
+    int syncGeneration = 0,
   }) async {
     final display = await resolveWidgetDisplay(
       preferences: preferences,
@@ -83,6 +109,7 @@ class HomeWidgetSyncService {
       preferences: preferences,
       headerTitle: display.headerTitle,
       headerEmoji: display.headerEmoji,
+      syncGeneration: syncGeneration,
     );
   }
 }

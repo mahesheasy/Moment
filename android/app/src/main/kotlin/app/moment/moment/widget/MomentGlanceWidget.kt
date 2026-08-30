@@ -53,27 +53,25 @@ class MomentGlanceWidget : GlanceAppWidget() {
                 emptyWidgetData()
             }
 
-        val bitmap =
+        val stack =
             withContext(Dispatchers.IO) {
                 try {
-                    val decoded =
-                        if (data.hasMoment) WidgetBitmap.decode(data.imagePath) else null
-                    if (decoded != null && data.privacyMode == "blur") {
-                        WidgetBitmap.blur(decoded)
-                    } else {
-                        decoded
-                    }
+                    loadWidgetStack(context)
                 } catch (error: Exception) {
-                    Log.e(TAG, "Failed to decode widget image", error)
-                    null
+                    Log.e(TAG, "Failed to load widget stack", error)
+                    emptyList()
                 }
             }
+
+        val bitmap = stack.firstOrNull()?.bitmap
 
         val avatarBitmap =
             withContext(Dispatchers.IO) {
                 try {
-                    if (data.avatarPath != null) {
-                        WidgetBitmap.decode(data.avatarPath)
+                    val avatarPath =
+                        stack.firstOrNull()?.entry?.avatarPath ?: data.avatarPath
+                    if (avatarPath != null) {
+                        WidgetBitmap.decode(avatarPath)
                     } else {
                         null
                     }
@@ -83,13 +81,100 @@ class MomentGlanceWidget : GlanceAppWidget() {
                 }
             }
 
+        val displayData = resolveDisplayData(data, stack)
+
         provideContent {
-            MomentWidgetContent(data = data, bitmap = bitmap, avatarBitmap = avatarBitmap)
+            MomentWidgetContent(
+                data = displayData,
+                bitmap = bitmap,
+                avatarBitmap = avatarBitmap,
+                stack = stack,
+            )
         }
     }
 
     companion object {
         private const val TAG = "MomentGlanceWidget"
+    }
+}
+
+/** Labels / deep links always follow the front stack card, not stale legacy prefs. */
+private fun resolveDisplayData(
+    base: MomentWidgetData,
+    stack: List<WidgetStackCard>,
+): MomentWidgetData {
+    val front = stack.firstOrNull()?.entry ?: return base
+    return base.copy(
+        hasMoment = true,
+        momentId = front.momentId,
+        senderName = front.senderName,
+        senderId = front.senderId,
+        imagePath = front.imagePath,
+        avatarPath = front.avatarPath,
+        caption = front.caption,
+        createdAtMillis = front.createdAtMillis,
+        relativeTime = front.relativeTime,
+    )
+}
+
+private fun loadWidgetStack(context: Context): List<WidgetStackCard> {
+    val queue = WidgetMomentQueue.loadQueue(context)
+    if (queue.isEmpty()) return emptyList()
+
+    val (index, _) = WidgetMomentQueue.queueMeta(context)
+    val depthCount = minOf(3, queue.size - index)
+    val patches = mutableListOf<WidgetMomentEntry>()
+
+    val cards =
+        (0 until depthCount).map { offset ->
+            val raw = queue[index + offset]
+            val entry = WidgetImageResolver.ensureCached(context, raw)
+            if (entry != raw) patches.add(entry)
+            val decoded = WidgetBitmap.decode(entry.imagePath)
+            val privacyMode = WidgetPrivacyResolver.resolve(context, entry.senderId)
+            val bitmap =
+                decoded?.let { source ->
+                    when {
+                        offset > 0 -> WidgetBitmap.blur(source)
+                        privacyMode == "blur" -> WidgetBitmap.blur(source)
+                        privacyMode == "private" -> source
+                        else ->
+                            resolveWidgetMomentBitmap(
+                                source = source,
+                                privacyMode = privacyMode,
+                                context = context,
+                                momentId = entry.momentId,
+                            )
+                    }
+                }
+            WidgetStackCard(entry = entry, bitmap = bitmap, depth = offset)
+        }
+
+    if (patches.isNotEmpty()) {
+        WidgetMomentQueue.patchEntries(context, patches)
+    }
+    return cards
+}
+
+/** Applies user privacy mode + per-view progressive preview blur to widget media. */
+internal fun resolveWidgetMomentBitmap(
+    source: Bitmap,
+    privacyMode: String,
+    context: Context,
+    momentId: String,
+): Bitmap {
+    if (privacyMode == "blur") {
+        return WidgetBitmap.blur(source)
+    }
+    if (privacyMode == "private") {
+        return source
+    }
+    return when (
+        val progress = WidgetMediaPrivacyPreview.previewProgress(context, momentId)
+    ) {
+        0f -> source
+        1f -> WidgetBitmap.blur(source)
+        else -> WidgetBitmap.blur(source, progress)
     }
 }
 
@@ -109,7 +194,7 @@ private fun emptyWidgetData(): MomentWidgetData =
         theme = "minimal",
         accentColor = "#FF6B8A",
         typography = "default",
-        displaySize = "large",
+        displaySize = "small",
         privacyMode = "full",
         showSender = true,
         showTimestamp = true,
@@ -118,7 +203,13 @@ private fun emptyWidgetData(): MomentWidgetData =
         paused = false,
         recentIndex = 0,
         recentCount = 0,
+        showStreak = true,
+        streakCount = 0,
+        renderSeq = 0L,
     )
+
+private fun widgetImageKey(momentId: String, renderSeq: Long): String =
+    "moment-$momentId-$renderSeq"
 
 private fun launchMainActivityIntent(): Intent =
     Intent(Intent.ACTION_MAIN).apply {
@@ -137,78 +228,111 @@ private fun MomentWidgetContent(
     data: MomentWidgetData,
     bitmap: Bitmap?,
     avatarBitmap: Bitmap?,
+    stack: List<WidgetStackCard> = emptyList(),
 ) {
     val style = WidgetThemeStyles.resolve(data.theme, data.accentColor, data.typography)
     val liveTime =
         WidgetRelativeTime.format(data.createdAtMillis).ifBlank { data.relativeTime }
+    val compact = data.displaySize != "large"
 
     Box(
         modifier =
             GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(Color.Black))
-                .cornerRadius(24.dp)
-                .padding(10.dp),
+                .background(ColorProvider(Color(0xFF0A0A0B)))
+                .cornerRadius(20.dp),
     ) {
-        Box(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .background(style.background)
-                    .cornerRadius(16.dp)
-                    .padding(2.dp)
-                    .background(style.accentColor)
-                    .cornerRadius(14.dp)
-                    .padding(2.dp)
-                    .background(style.background)
-                    .cornerRadius(12.dp),
-        ) {
-            when {
-                data.paused ->
-                    PrivateMomentLayout(
-                        title = "Widget paused",
-                        from = data.senderName.ifBlank { "Moment" },
-                        action = "Tap to resume",
-                        style = style,
-                        open = actionStartActivity(launchMainActivityIntent()),
-                    )
-                data.theme == "memory" && bitmap != null ->
-                    MemoryMomentLayout(
-                        data = data,
-                        bitmap = bitmap,
-                        style = style,
-                    )
-                data.privacyMode == "private" && data.hasMoment ->
-                    PrivateMomentLayout(
-                        title = "New Moment",
-                        from = "From ${data.senderName.ifBlank { "a friend" }}",
-                        action = "Tap to reveal",
-                        style = style,
-                        open = openMomentAction(data),
-                    )
-                bitmap != null && data.privacyMode == "blur" ->
-                    BlurMomentLayout(
-                        data = data,
-                        bitmap = bitmap,
-                        style = style,
-                        liveTime = liveTime,
-                    )
-                bitmap != null ->
-                    FullMomentLayout(
-                        data = data,
-                        bitmap = bitmap,
-                        avatarBitmap = avatarBitmap,
-                        style = style,
-                        liveTime = liveTime,
-                    )
-                data.hasMoment ->
-                    PendingMomentLayout(
-                        data = data,
-                        style = style,
-                        liveTime = liveTime,
-                    )
-                else -> EmptyWidgetLayout(data = data, style = style)
-            }
+        when {
+            data.paused ->
+                PrivateMomentLayout(
+                    title = "Widget paused",
+                    from = data.senderName.ifBlank { "Moment" },
+                    action = "Tap to resume",
+                    style = style,
+                    open = actionStartActivity(launchMainActivityIntent()),
+                )
+            compact && data.theme == "memory" && bitmap != null ->
+                LocketStackLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    stack = stack,
+                    style = style,
+                )
+            compact && data.privacyMode == "private" && data.hasMoment ->
+                LocketPrivateLayout(
+                    data = data,
+                    style = style,
+                )
+            compact && bitmap != null && data.privacyMode == "blur" ->
+                LocketStackLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    stack = stack,
+                    style = style,
+                    blurred = true,
+                )
+            compact && bitmap != null ->
+                LocketStackLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    stack = stack,
+                    style = style,
+                )
+            compact && data.hasMoment && bitmap == null ->
+                LocketPendingLayout(
+                    data = data,
+                    style = style,
+                    avatarBitmap = avatarBitmap,
+                    liveTime = liveTime,
+                )
+            compact ->
+                LocketEmptyLayout(
+                    data = data,
+                    style = style,
+                    avatarBitmap = avatarBitmap,
+                )
+            data.theme == "memory" && bitmap != null ->
+                MemoryMomentLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    style = style,
+                )
+            data.privacyMode == "private" && data.hasMoment ->
+                PrivateMomentLayout(
+                    title = "New Moment",
+                    from = "From ${data.senderName.ifBlank { "a friend" }}",
+                    action = "Tap to reveal",
+                    style = style,
+                    open = openMomentAction(data),
+                )
+            bitmap != null && data.privacyMode == "blur" ->
+                BlurMomentLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    style = style,
+                    liveTime = liveTime,
+                )
+            bitmap != null ->
+                FullMomentLayout(
+                    data = data,
+                    bitmap = bitmap,
+                    avatarBitmap = avatarBitmap,
+                    style = style,
+                    liveTime = liveTime,
+                    stack = stack,
+                )
+            data.hasMoment ->
+                PendingMomentLayout(
+                    data = data,
+                    style = style,
+                    liveTime = liveTime,
+                )
+            else ->
+                LocketEmptyLayout(
+                    data = data,
+                    style = style,
+                    avatarBitmap = avatarBitmap,
+                )
         }
     }
 }
@@ -220,6 +344,7 @@ private fun FullMomentLayout(
     avatarBitmap: Bitmap?,
     style: WidgetThemeStyle,
     liveTime: String,
+    stack: List<WidgetStackCard> = emptyList(),
 ) {
     val open = openMomentAction(data)
     val name = if (data.showSender) data.senderName.ifBlank { "Moment" } else ""
@@ -228,18 +353,29 @@ private fun FullMomentLayout(
     val scrim = WidgetThemeStyles.photoScrim(data.theme, accent)
     val headerEmoji =
         data.headerEmoji.ifBlank { WidgetThemeStyles.themeEmoji(data.theme) }
-    val themeLabel = WidgetThemeStyles.themeLabel(data.theme)
+    val showThemeHeader =
+        data.theme != "minimal" && headerEmoji.isNotBlank() && data.theme != "memory"
 
     Box(
-        modifier =
-            GlanceModifier
-                .fillMaxSize()
-                .clickable(open),
+        modifier = GlanceModifier.fillMaxSize(),
         contentAlignment = Alignment.TopStart,
     ) {
+        stack
+            .asReversed()
+            .drop(1)
+            .forEach { card ->
+                WidgetBehindCard(card = card)
+            }
+        Box(
+            modifier =
+                GlanceModifier
+                    .fillMaxSize()
+                    .clickable(open),
+            contentAlignment = Alignment.TopStart,
+        ) {
         Image(
             provider = ImageProvider(bitmap),
-            contentDescription = "Moment from ${data.senderName}",
+            contentDescription = widgetImageKey(data.momentId, data.renderSeq),
             modifier = GlanceModifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
@@ -249,27 +385,34 @@ private fun FullMomentLayout(
                     .fillMaxSize()
                     .background(ColorProvider(accent.copy(alpha = 0.12f))),
         ) {}
-        Row(
-            modifier =
-                GlanceModifier
-                    .fillMaxWidth()
-                    .padding(scale.pad.dp)
-                    .background(ColorProvider(Color(0x99000000)))
-                    .cornerRadius(10.dp)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "$headerEmoji  $themeLabel",
-                maxLines = 1,
-                style =
-                    textStyle(
-                        style,
-                        style.accentColor,
-                        scale.headerSize,
-                        FontWeight.Bold,
-                    ),
-            )
+        if (showThemeHeader) {
+            Row(
+                modifier =
+                    GlanceModifier
+                        .fillMaxWidth()
+                        .padding(scale.pad.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .background(ColorProvider(Color(0x99000000)))
+                            .cornerRadius(10.dp)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text = headerEmoji,
+                        maxLines = 1,
+                        style =
+                            textStyle(
+                                style,
+                                style.accentColor,
+                                scale.headerSize,
+                                FontWeight.Bold,
+                            ),
+                    )
+                }
+            }
         }
         if (avatarBitmap != null) {
             Box(
@@ -358,84 +501,40 @@ private fun FullMomentLayout(
                         )
                     }
                 }
-                Box(
-                    modifier =
-                        GlanceModifier
-                            .width(30.dp)
-                            .height(30.dp)
-                            .background(ColorProvider(Color(0x66000000)))
-                            .cornerRadius(8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "♡",
-                        style =
-                            textStyle(
-                                style,
-                                style.accentColor,
-                                scale.nameSize + 6,
-                                FontWeight.Bold,
-                            ),
-                    )
+                if (data.showStreak && data.streakCount > 0) {
+                    WidgetStreakBadge(count = data.streakCount, compact = false)
                 }
             }
         }
-        if (data.recentCount > 1) {
-            Box(
-                modifier =
-                    GlanceModifier
-                        .fillMaxWidth()
-                        .padding(bottom = (scale.overlayHeight + 8).dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    repeat(data.recentCount.coerceAtMost(5)) { index ->
-                        Text(
-                            text = if (index == data.recentIndex) "●" else "○",
-                            modifier = GlanceModifier.padding(horizontal = 2.dp),
-                            style =
-                                textStyle(
-                                    style,
-                                    if (index == data.recentIndex) {
-                                        style.accentColor
-                                    } else {
-                                        ColorProvider(Color(0x99FFFFFF))
-                                    },
-                                    9,
-                                ),
-                        )
-                    }
-                }
-            }
-            Row(
-                modifier = GlanceModifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier =
-                        GlanceModifier
-                            .width(44.dp)
-                            .fillMaxHeight()
-                            .clickable(
-                                actionRunCallback<WidgetCycleAction>(
-                                    actionParametersOf(WidgetCycleAction.DeltaKey to -1),
-                                ),
-                            ),
-                ) {}
-                Spacer(modifier = GlanceModifier.defaultWeight())
-                Box(
-                    modifier =
-                        GlanceModifier
-                            .width(44.dp)
-                            .fillMaxHeight()
-                            .clickable(
-                                actionRunCallback<WidgetCycleAction>(
-                                    actionParametersOf(WidgetCycleAction.DeltaKey to 1),
-                                ),
-                            ),
-                ) {}
-            }
+        WidgetCycleTapZones(enabled = data.recentCount > 1)
         }
+    }
+}
+
+private val locketRingColor = Color(0xFFF5C518)
+
+@Composable
+private fun WidgetStreakBadge(count: Int, compact: Boolean = true) {
+    Box(
+        modifier =
+            GlanceModifier
+                .background(ColorProvider(Color(0x73000000)))
+                .cornerRadius(999.dp)
+                .padding(
+                    horizontal = if (compact) 9.dp else 10.dp,
+                    vertical = if (compact) 5.dp else 6.dp,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "🔥 $count",
+            style =
+                TextStyle(
+                    color = ColorProvider(locketRingColor),
+                    fontSize = if (compact) 11.sp else 12.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+        )
     }
 }
 
@@ -517,16 +616,15 @@ private fun BlurMomentLayout(
                     }
                     if (data.showTimestamp && liveTime.isNotBlank()) {
                         Text(
-                            text = "🐣  $liveTime",
+                            text = liveTime,
                             modifier = GlanceModifier.padding(top = 2.dp),
                             style = textStyle(style, ColorProvider(Color(0xCCFFFFFF)), 12),
                         )
                     }
                 }
-                Text(
-                    text = "♡",
-                    style = textStyle(style, ColorProvider(Color.White), 14, FontWeight.Bold),
-                )
+                if (data.showStreak && data.streakCount > 0) {
+                    WidgetStreakBadge(count = data.streakCount)
+                }
             }
         }
     }
@@ -671,41 +769,539 @@ private fun PendingMomentLayout(
     }
 }
 
-@Composable
-private fun EmptyWidgetLayout(data: MomentWidgetData, style: WidgetThemeStyle) {
-    val openApp = actionStartActivity(launchMainActivityIntent())
-    val openCamera = actionStartActivity(launchDeepLink("camera"))
+private val locketAccent = Color(0xFFFF6B8A)
+private val locketMuted = Color(0xFF8E8E93)
 
-    Column(
+@Composable
+private fun LocketPendingLayout(
+    data: MomentWidgetData,
+    style: WidgetThemeStyle,
+    avatarBitmap: Bitmap?,
+    liveTime: String,
+) {
+    val open = openMomentAction(data)
+    val name = data.senderName.ifBlank { "a friend" }
+    val time = if (data.showTimestamp && liveTime.isNotBlank()) liveTime else data.relativeTime
+
+    Box(
         modifier =
             GlanceModifier
                 .fillMaxSize()
-                .clickable(openApp)
-                .padding(18.dp),
-        horizontalAlignment = Alignment.Start,
-        verticalAlignment = Alignment.Bottom,
+                .background(ColorProvider(Color(0xFF0A0A0B)))
+                .clickable(open),
+        contentAlignment = Alignment.TopStart,
     ) {
-        Text(
-            text = "MOMENT",
-            style = textStyle(style, style.accentColor, 10, FontWeight.Bold),
-        )
-        Spacer(GlanceModifier.height(6.dp))
-        Text(
-            text = "Waiting for a new moment",
-            style = textStyle(style, style.labelColor, 14, FontWeight.Bold),
-        )
-        Spacer(GlanceModifier.height(4.dp))
-        Text(
-            text = modeHint(data.widgetMode),
-            style = textStyle(style, style.secondaryColor, 12),
-        )
-        Spacer(GlanceModifier.height(14.dp))
-        Text(
-            text = "OPEN CAMERA",
-            modifier = GlanceModifier.clickable(openCamera),
-            style = textStyle(style, style.accentColor, 10, FontWeight.Bold),
-        )
+        Box(
+            modifier = GlanceModifier.padding(10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            LocketMiniAvatar(
+                avatarBitmap = avatarBitmap,
+                style = style,
+                size = 30,
+            )
+        }
+        Column(
+            modifier = GlanceModifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "✨",
+                style = textStyle(style, ColorProvider(Color(0xCCFFFFFF)), 20),
+            )
+            Spacer(GlanceModifier.height(6.dp))
+            Text(
+                text = "New moment",
+                style = textStyle(
+                    style,
+                    ColorProvider(Color(0xCCFFFFFF)),
+                    13,
+                    FontWeight.Medium,
+                ),
+            )
+            Spacer(GlanceModifier.height(3.dp))
+            Text(
+                text = "From $name",
+                maxLines = 2,
+                style = textStyle(style, ColorProvider(locketMuted), 10, FontWeight.Medium),
+            )
+            if (time.isNotBlank()) {
+                Spacer(GlanceModifier.height(2.dp))
+                Text(
+                    text = time,
+                    style = textStyle(style, ColorProvider(locketMuted), 9, FontWeight.Medium),
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun LocketEmptyLayout(
+    data: MomentWidgetData,
+    style: WidgetThemeStyle,
+    avatarBitmap: Bitmap?,
+) {
+    val openApp = actionStartActivity(launchMainActivityIntent())
+
+    Box(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .background(ColorProvider(Color(0xFF0A0A0B)))
+                .clickable(openApp),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Box(
+            modifier = GlanceModifier.padding(10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            LocketMiniAvatar(
+                avatarBitmap = avatarBitmap,
+                style = style,
+                size = 30,
+            )
+        }
+        Column(
+            modifier = GlanceModifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "📷",
+                style = textStyle(style, ColorProvider(Color(0x55FFFFFF)), 22),
+            )
+            Spacer(GlanceModifier.height(8.dp))
+            Text(
+                text = "No pics yet",
+                style = textStyle(
+                    style,
+                    ColorProvider(Color(0xCCFFFFFF)),
+                    13,
+                    FontWeight.Medium,
+                ),
+            )
+            Spacer(GlanceModifier.height(3.dp))
+            Text(
+                text = "Moments appear here",
+                style = textStyle(
+                    style,
+                    ColorProvider(locketMuted),
+                    10,
+                    FontWeight.Medium,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WidgetCycleTapZones(enabled: Boolean) {
+    if (!enabled) return
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                GlanceModifier
+                    .width(44.dp)
+                    .fillMaxHeight()
+                    .clickable(
+                        actionRunCallback<WidgetCycleAction>(
+                            actionParametersOf(WidgetCycleAction.DeltaKey to -1),
+                        ),
+                    ),
+        ) {}
+        Spacer(modifier = GlanceModifier.defaultWeight())
+        Box(
+            modifier =
+                GlanceModifier
+                    .width(44.dp)
+                    .fillMaxHeight()
+                    .clickable(
+                        actionRunCallback<WidgetCycleAction>(
+                            actionParametersOf(WidgetCycleAction.DeltaKey to 1),
+                        ),
+                    ),
+        ) {}
+    }
+}
+
+@Composable
+private fun WidgetBehindCard(card: WidgetStackCard) {
+    val depth = card.depth.coerceAtLeast(1)
+    val insetStart = (depth * 10).dp
+    val insetEnd = (depth * 4).dp
+    val insetTop = (depth * 8).dp
+    val insetBottom = (depth * 14).dp
+    val radius = (18 - depth).coerceAtLeast(14).dp
+    val sender = card.entry.senderName.ifBlank { "Friend" }
+
+    Box(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .padding(
+                    start = insetStart,
+                    end = insetEnd,
+                    top = insetTop,
+                    bottom = insetBottom,
+                )
+                .cornerRadius(radius)
+                .background(ColorProvider(Color(0xFF121214))),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        if (card.bitmap != null) {
+            Image(
+                provider = ImageProvider(card.bitmap),
+                contentDescription = widgetImageKey(card.entry.momentId, 0L),
+                modifier = GlanceModifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Box(
+            modifier =
+                GlanceModifier
+                    .fillMaxSize()
+                    .background(ColorProvider(Color(0x73000000))),
+        ) {}
+        Box(
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Box(
+                modifier =
+                    GlanceModifier
+                        .fillMaxWidth()
+                        .height(36.dp)
+                        .background(ColorProvider(Color(0x99000000))),
+            ) {}
+            Text(
+                text = sender,
+                maxLines = 1,
+                modifier = GlanceModifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                style =
+                    textStyle(
+                        WidgetThemeStyles.resolve("minimal", "#FF6B8A", "default"),
+                        ColorProvider(Color(0xCCFFFFFF)),
+                        10,
+                        FontWeight.Medium,
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocketStackLayout(
+    data: MomentWidgetData,
+    bitmap: Bitmap,
+    stack: List<WidgetStackCard>,
+    style: WidgetThemeStyle,
+    blurred: Boolean = false,
+) {
+    val front = stack.firstOrNull()?.entry
+    val momentId = front?.momentId ?: data.momentId
+    val open =
+        if (momentId.isNotEmpty()) {
+            actionStartActivity(launchDeepLink("moment/$momentId"))
+        } else {
+            actionStartActivity(launchMainActivityIntent())
+        }
+    val createdAt = front?.createdAtMillis ?: data.createdAtMillis
+    val liveTime =
+        WidgetRelativeTime.format(createdAt).ifBlank {
+            front?.relativeTime ?: data.relativeTime
+        }
+    val sender = (front?.senderName ?: data.senderName).ifBlank { "Friend" }
+
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        stack
+            .asReversed()
+            .drop(1)
+            .forEach { card ->
+                WidgetBehindCard(card = card)
+            }
+        Box(
+            modifier =
+                GlanceModifier
+                    .fillMaxSize()
+                    .clickable(open),
+            contentAlignment = Alignment.TopStart,
+        ) {
+            Image(
+                provider = ImageProvider(bitmap),
+                contentDescription = widgetImageKey(momentId, data.renderSeq),
+                modifier = GlanceModifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            if (blurred) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .fillMaxSize()
+                            .background(ColorProvider(Color(0x66000000))),
+                ) {}
+            }
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .background(ColorProvider(Color(0xA6000000))),
+                ) {}
+                Row(
+                    modifier =
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = GlanceModifier.defaultWeight()) {
+                        if (data.showSender) {
+                            Text(
+                                text = sender,
+                                maxLines = 1,
+                                style = textStyle(
+                                    style,
+                                    ColorProvider(Color.White),
+                                    13,
+                                    FontWeight.Bold,
+                                ),
+                            )
+                        }
+                        if (data.showTimestamp && liveTime.isNotBlank()) {
+                            Text(
+                                text = liveTime,
+                                style = textStyle(
+                                    style,
+                                    ColorProvider(Color(0xCCFFFFFF)),
+                                    10,
+                                    FontWeight.Medium,
+                                ),
+                            )
+                        }
+                    }
+                    if (data.showStreak && data.streakCount > 0) {
+                        WidgetStreakBadge(count = data.streakCount)
+                    }
+                }
+            }
+        }
+        WidgetCycleTapZones(enabled = data.recentCount > 1)
+    }
+}
+
+@Composable
+private fun LocketPhotoLayout(
+    data: MomentWidgetData,
+    bitmap: Bitmap,
+    style: WidgetThemeStyle,
+) {
+    val open = openMomentAction(data)
+    val liveTime =
+        WidgetRelativeTime.format(data.createdAtMillis).ifBlank { data.relativeTime }
+    val sender = data.senderName.ifBlank { "Friend" }
+
+    Box(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .clickable(open),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Image(
+            provider = ImageProvider(bitmap),
+            contentDescription = "Moment from $sender",
+            modifier = GlanceModifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            modifier = GlanceModifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Box(
+                modifier =
+                    GlanceModifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .background(ColorProvider(Color(0xA6000000))),
+            ) {}
+            Row(
+                modifier =
+                    GlanceModifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    if (data.showSender) {
+                        Text(
+                            text = sender,
+                            maxLines = 1,
+                            style = textStyle(
+                                style,
+                                ColorProvider(Color.White),
+                                13,
+                                FontWeight.Bold,
+                            ),
+                        )
+                    }
+                    if (data.showTimestamp && liveTime.isNotBlank()) {
+                        Text(
+                            text = liveTime,
+                            style = textStyle(
+                                style,
+                                ColorProvider(Color(0xCCFFFFFF)),
+                                10,
+                                FontWeight.Medium,
+                            ),
+                        )
+                    }
+                }
+                if (data.showStreak && data.streakCount > 0) {
+                    WidgetStreakBadge(count = data.streakCount)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocketMiniAvatar(
+    avatarBitmap: Bitmap?,
+    style: WidgetThemeStyle,
+    size: Int,
+) {
+    val inner = (size - 4).dp
+    Box(
+        modifier =
+            GlanceModifier
+                .width(size.dp)
+                .height(size.dp)
+                .background(ColorProvider(Color(0x33FFFFFF)))
+                .cornerRadius((size / 2).dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (avatarBitmap != null) {
+            Image(
+                provider = ImageProvider(avatarBitmap),
+                contentDescription = "Avatar",
+                modifier =
+                    GlanceModifier
+                        .width(inner)
+                        .height(inner)
+                        .cornerRadius((size / 2 - 2).dp),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Box(
+                modifier =
+                    GlanceModifier
+                        .width(inner)
+                        .height(inner)
+                        .background(ColorProvider(Color(0xFF1C1C1E)))
+                        .cornerRadius((size / 2 - 2).dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "♡",
+                    style = textStyle(
+                        style,
+                        ColorProvider(locketAccent),
+                        12,
+                        FontWeight.Bold,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocketBlurLayout(
+    data: MomentWidgetData,
+    bitmap: Bitmap,
+    style: WidgetThemeStyle,
+) {
+    val open = openMomentAction(data)
+
+    Box(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .clickable(open),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            provider = ImageProvider(bitmap),
+            contentDescription = "Hidden moment",
+            modifier = GlanceModifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            modifier =
+                GlanceModifier
+                    .fillMaxSize()
+                    .background(ColorProvider(Color(0x88000000))),
+        ) {}
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "♡",
+                style = textStyle(style, ColorProvider(Color.White), 24, FontWeight.Bold),
+            )
+            Spacer(GlanceModifier.height(6.dp))
+            Text(
+                text = "New moment",
+                style = textStyle(style, ColorProvider(Color.White), 13, FontWeight.Bold),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocketPrivateLayout(
+    data: MomentWidgetData,
+    style: WidgetThemeStyle,
+) {
+    val open = openMomentAction(data)
+
+    Box(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .clickable(open),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LocketMiniAvatar(avatarBitmap = null, style = style, size = 40)
+            Spacer(GlanceModifier.height(10.dp))
+            Text(
+                text = "Tap to reveal",
+                style = textStyle(style, ColorProvider(Color.White), 13, FontWeight.Bold),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyWidgetLayout(data: MomentWidgetData, style: WidgetThemeStyle) {
+    LocketEmptyLayout(data = data, style = style, avatarBitmap = null)
 }
 
 private fun modeHint(widgetMode: String): String =

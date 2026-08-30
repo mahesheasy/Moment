@@ -27,6 +27,35 @@ class MomentsRemoteDataSource {
     return _mapMomentRow(Map<String, dynamic>.from(data));
   }
 
+  Future<List<DateTime>> listActivityTimestamps(
+    String userId, {
+    int lookbackDays = 60,
+  }) async {
+    final since = DateTime.now()
+        .subtract(Duration(days: lookbackDays))
+        .toUtc()
+        .toIso8601String();
+
+    final sent = await _client
+        .from('moments')
+        .select('created_at')
+        .eq('sender_id', userId)
+        .gte('created_at', since);
+    final received = await _client
+        .from('moment_recipients')
+        .select('created_at')
+        .eq('recipient_id', userId)
+        .gte('created_at', since);
+
+    final days = <DateTime>{};
+    for (final row in [...sent as List, ...received as List]) {
+      final map = Map<String, dynamic>.from(row as Map);
+      final createdAt = DateTime.parse(map['created_at'] as String).toUtc();
+      days.add(DateTime(createdAt.year, createdAt.month, createdAt.day));
+    }
+    return days.toList();
+  }
+
   Future<Moment?> getLatestReceivedMomentFromSender({
     required String userId,
     required String senderId,
@@ -111,24 +140,58 @@ class MomentsRemoteDataSource {
   Future<List<Moment>> listMomentsSharedToCircle({
     required String circleId,
   }) async {
-    final data = await _client
+    final memberIds = await listCircleMemberIds(circleId);
+    if (memberIds.isEmpty) return [];
+
+    final memberSet = memberIds.toSet();
+    final byId = <String, Moment>{};
+
+    final promptData = await _client
         .from('prompt_responses')
-        .select('moment:moments!inner(*, sender:sender_id(*))')
+        .select('moment:moment_id(*, sender:sender_id(*))')
         .eq('circle_id', circleId)
         .order('created_at', ascending: false);
 
-    final seen = <String>{};
-    final moments = <Moment>[];
-    for (final row in data as List) {
+    for (final row in promptData as List) {
       final map = Map<String, dynamic>.from(row as Map);
       final momentJson = map['moment'] as Map?;
       if (momentJson == null) continue;
-      final momentId = momentJson['id'] as String;
-      if (!seen.add(momentId)) continue;
-      moments.add(
-        await _mapMomentFromJson(Map<String, dynamic>.from(momentJson)),
+      final moment = await _mapMomentFromJson(
+        Map<String, dynamic>.from(momentJson),
       );
+      byId[moment.id] = moment;
     }
+
+    final broadcastData = await _client
+        .from('moments')
+        .select(
+          '*, sender:sender_id(*), recipients:moment_recipients(recipient_id)',
+        )
+        .inFilter('sender_id', memberIds)
+        .order('created_at', ascending: false)
+        .limit(40);
+
+    for (final row in broadcastData as List) {
+      final map = Map<String, dynamic>.from(row as Map);
+      final senderId = map['sender_id'] as String;
+      final recipients = (map['recipients'] as List?)
+              ?.map((entry) => (entry as Map)['recipient_id'] as String)
+              .toSet() ??
+          {};
+      final expectedRecipients =
+          memberSet.where((id) => id != senderId).toSet();
+      if (expectedRecipients.isEmpty ||
+          !expectedRecipients.every(recipients.contains)) {
+        continue;
+      }
+
+      final momentJson = Map<String, dynamic>.from(map)..remove('recipients');
+      final moment = await _mapMomentFromJson(momentJson);
+      byId[moment.id] = moment;
+    }
+
+    final moments = byId.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return moments;
   }
 
@@ -156,8 +219,34 @@ class MomentsRemoteDataSource {
         .range(offset, offset + limit - 1);
 
     final rows = data as List;
-    return Future.wait(
+    final moments = await Future.wait(
       rows.map((row) => _mapMomentRow(Map<String, dynamic>.from(row as Map))),
+    );
+    moments.sort((a, b) {
+      final byTime = b.createdAt.compareTo(a.createdAt);
+      if (byTime != 0) return byTime;
+      return b.id.compareTo(a.id);
+    });
+    return moments;
+  }
+
+  Future<List<Moment>> listSentMoments({
+    required String userId,
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final data = await _client
+        .from('moments')
+        .select('*, sender:sender_id(*)')
+        .eq('sender_id', userId)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+
+    final rows = data as List;
+    return Future.wait(
+      rows.map(
+        (row) => _mapMomentFromJson(Map<String, dynamic>.from(row as Map)),
+      ),
     );
   }
 

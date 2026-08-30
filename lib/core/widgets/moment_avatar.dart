@@ -1,5 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/app/di/injection.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_radius.dart';
@@ -81,12 +81,15 @@ class _MomentAvatarState extends State<MomentAvatar> {
       ),
       clipBehavior: Clip.antiAlias,
       child: _resolvedUrl != null && !_failed
-          ? Image.network(
-              _resolvedUrl!,
+          ? CachedNetworkImage(
+              imageUrl: _resolvedUrl!,
               fit: BoxFit.cover,
               width: widget.size,
               height: widget.size,
-              errorBuilder: (_, _, _) =>
+              memCacheWidth: (widget.size * 3).round(),
+              placeholder: (_, _) =>
+                  _initialsWidget(_initialsText(widget.name), isDark),
+              errorWidget: (_, _, _) =>
                   _initialsWidget(_initialsText(widget.name), isDark),
             )
           : _initialsWidget(_initialsText(widget.name), isDark),

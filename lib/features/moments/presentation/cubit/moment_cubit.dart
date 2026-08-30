@@ -134,7 +134,7 @@ class HomeCubit extends Cubit<HomeState> {
     final circleFeed = await _loadCircleFeed(unseen);
 
     switch (widgetResult) {
-      case Success(:final value):
+      case Success():
         if (unseen.isEmpty) {
           emit(HomeState(status: HomeStatus.empty, circleFeed: circleFeed));
         } else {
@@ -151,13 +151,7 @@ class HomeCubit extends Cubit<HomeState> {
             ),
           );
         }
-        final widgetMoment = value ?? (unseen.isNotEmpty ? unseen.first : null);
-        if (widgetMoment != null) {
-          await _widgetSync.pushMoment(
-            moment: widgetMoment,
-            preferences: preferences,
-          );
-        }
+        await _widgetSync.sync(promoteLatest: true);
       case Failed(:final failure):
         emit(
           HomeState(status: HomeStatus.failure, errorMessage: failure.message),
@@ -359,7 +353,10 @@ class CameraState extends Equatable {
   final String? promptCircleId;
   final String? sentMomentId;
 
-  bool get isPromptMode => promptId != null && promptCircleId != null;
+  bool get isPromptMode =>
+      promptId != null && promptCircleId != null && promptId!.isNotEmpty;
+
+  bool get isCircleMode => promptCircleId != null;
 
   bool get hasSelection =>
       selectedRecipientIds.isNotEmpty || selectedCircleIds.isNotEmpty;
@@ -500,7 +497,7 @@ class CameraCubit extends Cubit<CameraState> {
     if (promptContext != null) {
       emit(
         state.copyWith(
-          promptId: promptContext.promptId,
+          promptId: promptContext.hasPrompt ? promptContext.promptId : null,
           promptCircleId: promptContext.circleId,
           promptText: promptContext.promptText,
           isLoadingRecipients: true,
@@ -529,7 +526,8 @@ class CameraCubit extends Cubit<CameraState> {
 
     if (promptContext != null) {
       selectedCircles = {promptContext.circleId};
-      if (promptText == null || promptText.isEmpty) {
+      if (promptContext.hasPrompt &&
+          (promptText == null || promptText.isEmpty)) {
         final promptResult = await _prompts.getTodaysPrompt();
         switch (promptResult) {
           case Success(:final value):
@@ -539,14 +537,14 @@ class CameraCubit extends Cubit<CameraState> {
         }
       }
 
-      final membersResult = await _prompts.getCircleMemberIds(
+      final membersResult = await _circles.getCircleMembers(
         promptContext.circleId,
       );
       switch (membersResult) {
         case Success(:final value):
-          final friendIds = {for (final friend in friends) friend.profile.id};
           selected = value
-              .where((id) => id != currentUserId && friendIds.contains(id))
+              .map((member) => member.profile.id)
+              .where((id) => id != currentUserId)
               .toSet();
         case Failed():
           break;

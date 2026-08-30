@@ -5,11 +5,12 @@ class AppRoutes {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String onboarding = '/onboarding';
+  static const String setupPermissions = '/setup/permissions';
   static const String home = '/home';
   static const String camera = '/camera';
   static const String friends = '/friends';
   static const String circles = '/circles';
-  static const String memories = '/memories';
+  static const String chat = '/chat';
   static const String settings = '/settings';
   static const String profile = '/profile';
   static const String profileEdit = '/profile/edit';
@@ -31,6 +32,8 @@ class AppRoutes {
     return '$path?heroScope=$heroScope';
   }
 
+  static String chatThread(String userId) => '/chat/$userId';
+
   static String friend(String id) => '/friends/$id';
 
   static String cameraForPrompt({
@@ -38,7 +41,10 @@ class AppRoutes {
     required String promptId,
   }) => '$camera?circleId=$circleId&promptId=$promptId';
 
+  static String cameraForCircle(String circleId) => '$camera?circleId=$circleId';
+
   static String circleToday(String circleId) => '/circles/$circleId/today';
+  static String circleMoments(String circleId) => '/circles/$circleId/moments';
   static String circle(String id) => '/circles/$id';
   static String memoryEdit(String id) => '/memories/$id/edit';
   static String memory(String id) => '/memories/$id';

@@ -14,8 +14,11 @@ import 'package:moment/core/utils/relative_time.dart';
 import 'package:moment/core/widgets/dashed_border.dart';
 import 'package:moment/core/widgets/dark_page_chrome.dart';
 import 'package:moment/core/widgets/moment_cached_image.dart';
+import 'package:moment/core/widgets/moment_sheet_dialog.dart';
 import 'package:moment/core/widgets/moment_states.dart';
+import 'package:moment/features/auth/domain/repositories/auth_repository.dart';
 import 'package:moment/features/circles/domain/entities/circle.dart';
+import 'package:moment/features/circles/domain/repositories/circle_repository.dart';
 import 'package:moment/features/circles/presentation/circles_list_refresh.dart';
 import 'package:moment/features/circles/presentation/cubit/circles_cubit.dart';
 import 'package:moment/features/circles/presentation/widgets/circle_icon.dart';
@@ -258,6 +261,105 @@ class _CirclesBodyState extends State<_CirclesBody> {
     );
   }
 
+  Future<void> _showCircleCardMenu(BuildContext context, Circle circle) async {
+    final me = sl<AuthRepository>().currentUserId;
+    final isOwner = me != null && circle.ownerId == me;
+
+    final action = await showModalBottomSheet<_CircleCardMenuAction>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CircleCardMenuTile(
+                icon: Icons.open_in_new_rounded,
+                label: 'Open circle',
+                onTap: () =>
+                    Navigator.pop(sheetContext, _CircleCardMenuAction.open),
+              ),
+              if (isOwner)
+                _CircleCardMenuTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete circle',
+                  destructive: true,
+                  onTap: () =>
+                      Navigator.pop(sheetContext, _CircleCardMenuAction.delete),
+                )
+              else
+                _CircleCardMenuTile(
+                  icon: Icons.logout_rounded,
+                  label: 'Leave circle',
+                  onTap: () =>
+                      Navigator.pop(sheetContext, _CircleCardMenuAction.leave),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+
+    switch (action) {
+      case _CircleCardMenuAction.open:
+        await context.push(AppRoutes.circle(circle.id));
+        if (context.mounted) await context.read<CirclesCubit>().load();
+      case _CircleCardMenuAction.leave:
+        final confirmed = await MomentDialog.confirm(
+          context,
+          title: 'Leave circle?',
+          message: 'You will no longer see moments shared to this circle.',
+          confirmLabel: 'Leave',
+        );
+        if (confirmed != true || !context.mounted) return;
+        final result = await sl<CircleRepository>().leaveCircle(
+          circleId: circle.id,
+        );
+        if (!context.mounted) return;
+        if (result is Success) {
+          await context.read<CirclesCubit>().load();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result.failureOrNull?.message ?? 'Could not leave circle.',
+              ),
+            ),
+          );
+        }
+      case _CircleCardMenuAction.delete:
+        final confirmed = await MomentDialog.confirm(
+          context,
+          title: 'Delete "${circle.name}"?',
+          message:
+              'This permanently removes the circle for everyone. This cannot be undone.',
+          confirmLabel: 'Delete',
+        );
+        if (confirmed != true || !context.mounted) return;
+        final result = await sl<CircleRepository>().deleteCircle(
+          circleId: circle.id,
+        );
+        if (!context.mounted) return;
+        if (result is Success) {
+          await context.read<CirclesCubit>().load();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result.failureOrNull?.message ?? 'Could not delete circle.',
+              ),
+            ),
+          );
+        }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.state.status == CirclesStatus.loading &&
@@ -344,11 +446,13 @@ class _CirclesBodyState extends State<_CirclesBody> {
                       await context.read<CirclesCubit>().load();
                     }
                   },
+                  onMore: () => _showCircleCardMenu(context, circle),
                 ),
               ),
             ),
           SizedBox(height: AppSpacing.sm),
-          _CreateCircleCta(onTap: () => widget.onCreate(null)),
+          if (widget.state.circles.isEmpty)
+            _CreateCircleCta(onTap: () => widget.onCreate(null)),
         ],
       ),
     );
@@ -464,6 +568,7 @@ class _CirclesHeader extends StatelessWidget {
 class _CircleCard extends StatelessWidget {
   const _CircleCard({
     required this.onTap,
+    this.onMore,
     this.circle,
     this.activity,
     this.members = const [],
@@ -479,6 +584,7 @@ class _CircleCard extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final VoidCallback onTap;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -492,12 +598,8 @@ class _CircleCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.borderDark),
-          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -510,9 +612,6 @@ class _CircleCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surfaceElevatedDark,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.borderDark.withValues(alpha: 0.8),
-                    ),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -520,7 +619,7 @@ class _CircleCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 22),
                   ),
                 ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,7 +631,7 @@ class _CircleCard extends StatelessWidget {
                       style: SettingsType.body(AppColors.textPrimaryDark)
                           .copyWith(fontWeight: FontWeight.w500),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     if (circle != null)
                       Text.rich(
                         TextSpan(
@@ -559,79 +658,121 @@ class _CircleCard extends StatelessWidget {
                           AppColors.textTertiaryDark,
                         ),
                       ),
+                    if (circle != null &&
+                        activity?.latestActivityAt != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Last moment · ${relativeTimeAgo(activity!.latestActivityAt!)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SettingsType.caption(
+                          AppColors.textTertiaryDark,
+                        ),
+                      ),
+                    ],
                     if (circle != null && members.isNotEmpty) ...[
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          CircleMemberAvatarStack(
-                            circleId: circle!.id,
-                            members: members,
-                          ),
-                          Spacer(),
-                          if (activity?.latestActivityAt != null)
-                            Text(
-                              'Last moment · ${relativeTimeAgo(activity!.latestActivityAt!)}',
-                              style: SettingsType.caption(
-                                AppColors.textTertiaryDark,
-                              ),
-                            ),
-                        ],
+                      const SizedBox(height: 8),
+                      CircleMemberAvatarStack(
+                        circleId: circle!.id,
+                        members: members,
                       ),
                     ],
                   ],
                 ),
               ),
-              if (circle != null && activity?.latestImageUrl != null) ...[
-                SizedBox(width: 8),
-                Stack(
-                  clipBehavior: Clip.none,
+              if (circle != null) ...[
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: MomentCachedImage(
-                        imageUrl: activity!.latestImageUrl!,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    if (momentCount > 0)
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: AppColors.violet,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            momentCount > 9 ? '9+' : '$momentCount',
-                            style: SettingsType.caption(Colors.white).copyWith(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w500,
+                    if (activity?.latestImageUrl != null)
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: MomentCachedImage(
+                              imageUrl: activity!.latestImageUrl!,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        ),
+                          if (momentCount > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.violet,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  momentCount > 9 ? '9+' : '$momentCount',
+                                  style:
+                                      SettingsType.caption(Colors.white).copyWith(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    if (onMore != null)
+                      IconButton(
+                        onPressed: onMore,
+                      icon: const Icon(Icons.more_horiz_rounded),
+                      color: AppColors.textTertiaryDark,
+                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      tooltip: 'Circle options',
+                    ),
                   ],
                 ),
               ],
-              SizedBox(width: 6),
-              Padding(
-                padding: EdgeInsets.only(top: 14),
-                child: Icon(
-                  AppIcons.chevronRight,
-                  size: 16,
-                  color: AppColors.textTertiaryDark,
-                ),
-              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _CircleCardMenuAction { open, leave, delete }
+
+class _CircleCardMenuTile extends StatelessWidget {
+  const _CircleCardMenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? AppColors.errorDark : AppColors.textPrimaryDark;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(
+        label,
+        style: SettingsType.body(color).copyWith(fontWeight: FontWeight.w500),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/constants/app_constants.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_durations.dart';
+import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
 import 'package:moment/core/widget/home_widget_sync_service.dart';
 
 class SplashPage extends StatefulWidget {
@@ -39,9 +40,15 @@ class _SplashPageState extends State<SplashPage>
 
     final authed = context.read<SessionCubit>().state.isAuthenticated;
     if (authed) {
-      unawaited(sl<HomeWidgetSyncService>().sync());
+      unawaited(sl<HomeWidgetSyncService>().sync(promoteLatest: true));
     }
-    context.go(authed ? AppRoutes.home : AppRoutes.onboarding);
+    context.go(
+      authed
+          ? (await sl<SetupPreferencesLocalCache>().isPermissionsSetupComplete()
+                ? AppRoutes.home
+                : AppRoutes.setupPermissions)
+          : AppRoutes.onboarding,
+    );
   }
 
   @override

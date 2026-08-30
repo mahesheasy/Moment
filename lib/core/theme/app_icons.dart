@@ -15,8 +15,8 @@ class AppIcons {
   static const IconData homeFilled = Icons.home_rounded;
   static const IconData circles = Icons.people_alt_outlined;
   static const IconData circlesFilled = Icons.people_alt_rounded;
-  static const IconData memories = Icons.auto_stories_outlined;
-  static const IconData memoriesFilled = Icons.auto_stories_rounded;
+  static const IconData chat = Icons.chat_bubble_outline_rounded;
+  static const IconData chatFilled = Icons.chat_bubble_rounded;
   static const IconData heart = Icons.favorite_border_rounded;
   static const IconData heartFilled = Icons.favorite_rounded;
   static const IconData wave = Icons.waving_hand_outlined;

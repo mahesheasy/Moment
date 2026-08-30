@@ -9,11 +9,11 @@ import 'package:moment/app/lifecycle/session_cubit.dart';
 import 'package:moment/core/constants/app_constants.dart';
 import 'package:moment/core/push/push_bridge.dart';
 import 'package:moment/core/push/push_registration_service.dart';
-import 'package:moment/core/realtime/moment_realtime_subscriber.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_theme.dart';
 import 'package:moment/core/theme/moment_colors.dart';
 import 'package:moment/core/widget/home_widget_sync_service.dart';
+import 'package:moment/core/widget/widget_moment_stream_service.dart';
 import 'package:moment/features/settings/data/datasources/notification_preferences_local_cache.dart';
 import 'package:moment/features/settings/presentation/cubit/appearance_cubit.dart';
 
@@ -38,7 +38,7 @@ class _MomentAppState extends State<MomentApp> {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _lifecycleSubscription = sl<AppLifecycleCubit>().stream.listen((state) {
       if (state.status == AppLifecycleState.resumed) {
-        unawaited(sl<HomeWidgetSyncService>().sync());
+        unawaited(sl<HomeWidgetSyncService>().sync(promoteLatest: true));
         if (sl<SessionCubit>().state.isAuthenticated) {
           unawaited(sl<PushRegistrationService>().register());
         }
@@ -48,20 +48,16 @@ class _MomentAppState extends State<MomentApp> {
       if (state.isAuthenticated) {
         unawaited(sl<PushRegistrationService>().register());
         unawaited(_syncNotificationPreferences());
-        sl<MomentRealtimeSubscriber>().listen(() {
-          unawaited(sl<HomeWidgetSyncService>().sync());
-        });
+        sl<WidgetMomentStreamService>().start();
       } else {
-        sl<MomentRealtimeSubscriber>().dispose();
+        sl<WidgetMomentStreamService>().stop();
       }
     });
     final session = sl<SessionCubit>().state;
     if (session.isAuthenticated) {
       unawaited(sl<PushRegistrationService>().register());
       unawaited(_syncNotificationPreferences());
-      sl<MomentRealtimeSubscriber>().listen(() {
-        unawaited(sl<HomeWidgetSyncService>().sync());
-      });
+      sl<WidgetMomentStreamService>().start();
     }
   }
 

@@ -1,12 +1,14 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_typography.dart';
 import 'package:moment/core/theme/app_radius.dart';
 import 'package:moment/core/theme/widget_theme_palette.dart';
 import 'package:moment/core/theme/widget_typography_styles.dart';
+import 'package:moment/core/widgets/moment_cached_image.dart';
+import 'package:moment/core/widgets/moment_media_privacy_preview.dart';
+import 'package:moment/core/widgets/widget_moment_stack.dart';
 import 'package:moment/features/widget_preferences/domain/entities/widget_preferences.dart';
 /// Home-screen widget preview — Full, Blur, Private, Memory.
 class WidgetStylePreview extends StatelessWidget {
@@ -25,6 +27,9 @@ class WidgetStylePreview extends StatelessWidget {
     this.backgroundTint = 0.35,
     this.cornerRadius = 20,
     this.momentSourceLabel = 'Latest moment',
+    this.locketPreview = false,
+    this.streakCount = 0,
+    this.stackMoments,
     super.key,
   });
 
@@ -46,6 +51,9 @@ class WidgetStylePreview extends StatelessWidget {
   final double backgroundTint;
   final double cornerRadius;
   final String momentSourceLabel;
+  final bool locketPreview;
+  final int streakCount;
+  final List<WidgetStackPreviewMoment>? stackMoments;
 
   WidgetPreferences get _resolved {
     if (forcePrivacyMode != null) {
@@ -58,6 +66,101 @@ class WidgetStylePreview extends StatelessWidget {
   Color get _accent => _parseAccent(preferences.accentColor);
 
   WidgetThemePalette get _palette => WidgetThemePalette.forTheme(preferences.theme);
+
+  bool get _usesLocketLayout =>
+      locketPreview || _resolved.displaySize == WidgetDisplaySize.small;
+
+  Widget _buildPreviewFace(BuildContext context) {
+    if (compact) {
+      return _QuietMark(preferences: _resolved);
+    }
+
+    final stack = stackMoments;
+    if (stack != null && stack.isNotEmpty) {
+      Widget buildCard(
+        BuildContext context,
+        WidgetStackPreviewMoment moment,
+        bool isFront,
+      ) {
+        if (_usesLocketLayout) {
+          return _LocketMomentFace(
+            sender: moment.title,
+            relativeTime: moment.relativeTime,
+            imageUrl: moment.imageUrl,
+            showSender: _resolved.showSender,
+            showTimestamp: _resolved.showTimestamp,
+            showStreak: _resolved.showStreak && isFront,
+            streakCount: moment.streakCount,
+            dimmed: !isFront,
+          );
+        }
+        if (studioPreview) {
+          return _StudioFace(
+            sender: moment.title,
+            relativeTime: moment.relativeTime,
+            showSender: _resolved.showSender,
+            showCaptions: _resolved.showCaptions,
+            accent: _accent,
+            typography: _resolved.typography,
+            theme: _resolved.theme,
+            backgroundTint: backgroundTint,
+            momentSourceLabel: momentSourceLabel,
+            wrapPrivacy: false,
+          );
+        }
+        return _FullFace(
+          sender: moment.title,
+          relativeTime: moment.relativeTime,
+          showSender: _resolved.showSender,
+          showTimestamp: _resolved.showTimestamp,
+          showCaptions: _resolved.showCaptions,
+          accent: _accent,
+          theme: _resolved.theme,
+          typography: _resolved.typography,
+          palette: _palette,
+          wrapPrivacy: false,
+          streakCount: moment.streakCount,
+          showStreak: _resolved.showStreak && isFront,
+        );
+      }
+
+      if (stack.length == 1) {
+        final moment = stack.first;
+        final card = buildCard(context, moment, true);
+        if (_resolved.privacyMode == WidgetPrivacyMode.full) {
+          return MomentMediaPrivacyPreview(
+            key: ValueKey(moment.id),
+            child: card,
+          );
+        }
+        return card;
+      }
+
+      return WidgetMomentStack(
+        moments: stack,
+        privacyEnabled: _resolved.privacyMode == WidgetPrivacyMode.full,
+        cardBuilder: buildCard,
+      );
+    }
+
+    if (locketPreview) {
+      return _LocketEmptyFace(
+        showStreak: _resolved.showStreak,
+        streakCount: streakCount,
+      );
+    }
+
+    return _MomentWidgetFace(
+      preferences: _resolved,
+      sender: headerTitle,
+      relativeTime: relativeTime,
+      accent: _accent,
+      palette: _palette,
+      studioPreview: studioPreview,
+      backgroundTint: backgroundTint,
+      momentSourceLabel: momentSourceLabel,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,18 +194,7 @@ class WidgetStylePreview extends StatelessWidget {
     final size = compact ? 44.0 : previewSize;
     final radius = compact ? 14.0 : (borderless || studioPreview ? cornerRadius : 28.0);
 
-    final face = compact
-        ? _QuietMark(preferences: _resolved)
-        : _MomentWidgetFace(
-            preferences: _resolved,
-            sender: headerTitle,
-            relativeTime: relativeTime,
-            accent: _accent,
-            palette: _palette,
-            studioPreview: studioPreview,
-            backgroundTint: backgroundTint,
-            momentSourceLabel: momentSourceLabel,
-          );
+    final face = _buildPreviewFace(context);
 
     final Widget tile;
     if (compact) {
@@ -423,6 +515,7 @@ class _StudioFace extends StatelessWidget {
     required this.theme,
     required this.backgroundTint,
     required this.momentSourceLabel,
+    this.wrapPrivacy = true,
   });
 
   final String sender;
@@ -434,6 +527,7 @@ class _StudioFace extends StatelessWidget {
   final WidgetTheme theme;
   final double backgroundTint;
   final String momentSourceLabel;
+  final bool wrapPrivacy;
 
   @override
   Widget build(BuildContext context) {
@@ -444,7 +538,12 @@ class _StudioFace extends StatelessWidget {
       fit: StackFit.expand,
       clipBehavior: Clip.hardEdge,
       children: [
-        _PhotoBed(theme: theme, photoFirst: true),
+        if (wrapPrivacy)
+          MomentMediaPrivacyPreview(
+            child: _PhotoBed(theme: theme, photoFirst: true),
+          )
+        else
+          _PhotoBed(theme: theme, photoFirst: true),
         ColoredBox(color: palette.overlayTop.withValues(alpha: backgroundTint.clamp(0, 0.85))),
         ColoredBox(color: accent.withValues(alpha: 0.08)),
         Positioned(
@@ -580,6 +679,9 @@ class _FullFace extends StatelessWidget {
     required this.theme,
     required this.typography,
     required this.palette,
+    this.wrapPrivacy = true,
+    this.showStreak = false,
+    this.streakCount = 0,
   });
 
   final String sender;
@@ -591,6 +693,9 @@ class _FullFace extends StatelessWidget {
   final WidgetTheme theme;
   final WidgetTypography typography;
   final WidgetThemePalette palette;
+  final bool wrapPrivacy;
+  final bool showStreak;
+  final int streakCount;
 
   @override
   Widget build(BuildContext context) {
@@ -600,7 +705,12 @@ class _FullFace extends StatelessWidget {
       fit: StackFit.expand,
       clipBehavior: Clip.hardEdge,
       children: [
-        _PhotoBed(theme: theme, photoFirst: true),
+        if (wrapPrivacy)
+          MomentMediaPrivacyPreview(
+            child: _PhotoBed(theme: theme, photoFirst: true),
+          )
+        else
+          _PhotoBed(theme: theme, photoFirst: true),
         // Bottom scrim for readable overlay text
         Positioned(
           left: 0,
@@ -703,22 +813,33 @@ class _FullFace extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black.withValues(alpha: 0.35),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
+              if (showStreak && streakCount > 0)
+                Text(
+                  '🔥 $streakCount',
+                  style: WidgetTypographyStyles.label(
+                    typography,
+                    size: 12,
+                    color: const Color(0xFFF5C518),
+                    weight: FontWeight.w700,
+                  ),
+                )
+              else
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.35),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.favorite_border_rounded,
+                    size: 16,
+                    color: accent,
                   ),
                 ),
-                child: Icon(
-                  Icons.favorite_border_rounded,
-                  size: 16,
-                  color: accent,
-                ),
-              ),
             ],
           ),
         ),
@@ -955,6 +1076,262 @@ class _MemoryFace extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LocketMomentFace extends StatelessWidget {
+  const _LocketMomentFace({
+    required this.sender,
+    required this.relativeTime,
+    required this.showSender,
+    required this.showTimestamp,
+    required this.showStreak,
+    required this.streakCount,
+    this.imageUrl,
+    this.dimmed = false,
+  });
+
+  final String sender;
+  final String relativeTime;
+  final bool showSender;
+  final bool showTimestamp;
+  final bool showStreak;
+  final int streakCount;
+  final String? imageUrl;
+  final bool dimmed;
+
+  static const _ringColor = Color(0xFFF5C518);
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0B),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dimmed ? 0.2 : 0.35),
+            blurRadius: dimmed ? 10 : 16,
+            offset: Offset(0, dimmed ? 4 : 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Builder(
+              builder: (context) {
+                Widget photo = imageUrl != null
+                    ? MomentCachedImage(imageUrl: imageUrl!, fit: BoxFit.cover)
+                    : const _PhotoBed(
+                        theme: WidgetTheme.minimal,
+                        photoFirst: true,
+                      );
+                if (dimmed) {
+                  photo = ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                    child: photo,
+                  );
+                }
+                return photo;
+              },
+            ),
+            if (dimmed)
+              ColoredBox(color: Colors.black.withValues(alpha: 0.35)),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 52,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.72),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showSender)
+                          Text(
+                            sender,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        if (showTimestamp && relativeTime.isNotEmpty)
+                          Text(
+                            relativeTime,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (showStreak && streakCount > 0)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        child: Text(
+                          '🔥 $streakCount',
+                          style: const TextStyle(
+                            color: _ringColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocketEmptyFace extends StatelessWidget {
+  const _LocketEmptyFace({
+    required this.showStreak,
+    required this.streakCount,
+  });
+
+  final bool showStreak;
+  final int streakCount;
+
+  static const _accent = Color(0xFFFF6B8A);
+  static const _muted = Color(0xFF8E8E93);
+  static const _ringColor = Color(0xFFF5C518);
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF0A0A0B),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Positioned(
+            top: 10,
+            left: 10,
+            child: _MiniAvatarPlaceholder(),
+          ),
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '📷',
+                  style: TextStyle(fontSize: 22, color: Color(0x55FFFFFF)),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'No pics yet',
+                  style: TextStyle(
+                    color: Color(0xCCFFFFFF),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Moments appear here',
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (showStreak && streakCount > 0)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 10,
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      '🔥 $streakCount',
+                      style: const TextStyle(
+                        color: _ringColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniAvatarPlaceholder extends StatelessWidget {
+  const _MiniAvatarPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF1C1C1E),
+        border: Border.all(color: Color(0x33FFFFFF)),
+      ),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.favorite_rounded,
+        color: _LocketEmptyFace._accent,
+        size: 14,
       ),
     );
   }

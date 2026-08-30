@@ -26,6 +26,9 @@ data class MomentWidgetData(
     val paused: Boolean,
     val recentIndex: Int = 0,
     val recentCount: Int = 0,
+    val showStreak: Boolean = true,
+    val streakCount: Int = 0,
+    val renderSeq: Long = 0L,
 )
 
 object MomentWidgetDataStore {
@@ -54,6 +57,11 @@ object MomentWidgetDataStore {
     const val KEY_PAUSED = "paused"
     const val KEY_PRIVACY_PERSON = "privacy_person_id"
     const val KEY_HAS_CUSTOMIZATION = "has_customization"
+    const val KEY_SHOW_STREAK = "show_streak"
+    const val KEY_STREAK_COUNT = "streak_count"
+    const val KEY_PREVIEW_STARTED_AT = "preview_started_at"
+    const val KEY_PREVIEW_MOMENT_ID = "preview_moment_id"
+    const val KEY_RENDER_SEQ = "widget_render_seq"
 
     fun save(
         context: Context,
@@ -101,6 +109,8 @@ object MomentWidgetDataStore {
         lockScreenPrivacy: Boolean?,
         paused: Boolean?,
         privacyPersonId: String? = null,
+        showStreak: Boolean? = null,
+        streakCount: Int? = null,
     ) {
         val editor =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -124,6 +134,8 @@ object MomentWidgetDataStore {
             editor.putBoolean(KEY_LOCK_SCREEN, lockScreenPrivacy)
         }
         if (paused != null) editor.putBoolean(KEY_PAUSED, paused)
+        if (showStreak != null) editor.putBoolean(KEY_SHOW_STREAK, showStreak)
+        if (streakCount != null) editor.putInt(KEY_STREAK_COUNT, streakCount)
         when {
             privacyPersonId.isNullOrBlank() -> editor.remove(KEY_PRIVACY_PERSON)
             privacyPersonId != null -> editor.putString(KEY_PRIVACY_PERSON, privacyPersonId)
@@ -138,7 +150,7 @@ object MomentWidgetDataStore {
         val theme = prefs.getString(KEY_THEME, "minimal")
         val accent = prefs.getString(KEY_ACCENT, "#FF6B8A")
         val typography = prefs.getString(KEY_TYPOGRAPHY, "default")
-        val displaySize = prefs.getString(KEY_DISPLAY_SIZE, "large")
+        val displaySize = prefs.getString(KEY_DISPLAY_SIZE, "small")
         val widgetMode = prefs.getString(KEY_WIDGET_MODE, "latest")
         val privacyMode = prefs.getString(KEY_PRIVACY_MODE, "full")
         val showSender = prefs.getBoolean(KEY_SHOW_SENDER, true)
@@ -176,25 +188,39 @@ object MomentWidgetDataStore {
         val (recentIndex, recentCount) = WidgetMomentQueue.queueMeta(context)
         val queue = WidgetMomentQueue.loadQueue(context)
         val active = queue.getOrNull(recentIndex)
-        val senderId = active?.senderId ?: (prefs.getString(KEY_SENDER_ID, "") ?: "")
+        val senderId =
+            active?.senderId
+                ?: (prefs.getString(KEY_SENDER_ID, "") ?: "")
         val effectivePrivacy = WidgetPrivacyResolver.resolve(context, senderId)
 
         return MomentWidgetData(
             hasMoment = prefs.getBoolean(KEY_HAS_MOMENT, false) || active != null,
-            senderName = active?.senderName ?: (prefs.getString(KEY_SENDER, "") ?: ""),
+            senderName =
+                active?.senderName
+                    ?: (prefs.getString(KEY_SENDER, "") ?: ""),
             senderId = senderId,
-            momentId = active?.momentId ?: (prefs.getString(KEY_MOMENT_ID, "") ?: ""),
-            imagePath = active?.imagePath ?: prefs.getString(KEY_IMAGE_PATH, null),
-            caption = active?.caption ?: (prefs.getString(KEY_CAPTION, "") ?: ""),
-            relativeTime = active?.relativeTime ?: (prefs.getString(KEY_RELATIVE_TIME, "") ?: ""),
-            createdAtMillis = active?.createdAtMillis ?: prefs.getLong(KEY_CREATED_AT, 0L),
+            momentId =
+                active?.momentId
+                    ?: (prefs.getString(KEY_MOMENT_ID, "") ?: ""),
+            imagePath =
+                if (active != null) active.imagePath else prefs.getString(KEY_IMAGE_PATH, null),
+            caption =
+                active?.caption
+                    ?: (prefs.getString(KEY_CAPTION, "") ?: ""),
+            relativeTime =
+                active?.relativeTime
+                    ?: (prefs.getString(KEY_RELATIVE_TIME, "") ?: ""),
+            createdAtMillis =
+                active?.createdAtMillis
+                    ?: prefs.getLong(KEY_CREATED_AT, 0L),
             widgetMode = prefs.getString(KEY_WIDGET_MODE, "latest") ?: "latest",
             headerEmoji = prefs.getString(KEY_HEADER_EMOJI, "") ?: "",
-            avatarPath = active?.avatarPath ?: prefs.getString(KEY_AVATAR_PATH, null),
+            avatarPath =
+                if (active != null) active.avatarPath else prefs.getString(KEY_AVATAR_PATH, null),
             theme = prefs.getString(KEY_THEME, "minimal") ?: "minimal",
             accentColor = prefs.getString(KEY_ACCENT, "#FF6B8A") ?: "#FF6B8A",
             typography = prefs.getString(KEY_TYPOGRAPHY, "default") ?: "default",
-            displaySize = prefs.getString(KEY_DISPLAY_SIZE, "large") ?: "large",
+            displaySize = prefs.getString(KEY_DISPLAY_SIZE, "small") ?: "small",
             privacyMode = effectivePrivacy,
             showSender = prefs.getBoolean(KEY_SHOW_SENDER, true),
             showTimestamp = prefs.getBoolean(KEY_SHOW_TIMESTAMP, true),
@@ -203,6 +229,9 @@ object MomentWidgetDataStore {
             paused = prefs.getBoolean(KEY_PAUSED, false),
             recentIndex = recentIndex,
             recentCount = recentCount,
+            showStreak = prefs.getBoolean(KEY_SHOW_STREAK, true),
+            streakCount = prefs.getInt(KEY_STREAK_COUNT, 0),
+            renderSeq = prefs.getLong(KEY_RENDER_SEQ, 0L),
         )
     }
 }

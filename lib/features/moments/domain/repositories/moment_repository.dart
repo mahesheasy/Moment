@@ -20,6 +20,11 @@ abstract class MomentRepository {
     MomentSeenFilter seenFilter = MomentSeenFilter.all,
   });
 
+  Future<Result<List<Moment>>> listSentMoments({
+    int limit = 40,
+    int offset = 0,
+  });
+
   Future<Result<List<Moment>>> listMomentsSharedToCircle(String circleId);
 
   Future<Result<Moment>> createMoment(CreateMomentInput input);
@@ -29,4 +34,6 @@ abstract class MomentRepository {
   Future<Result<void>> removeFromFeed(String momentId);
 
   Future<Result<void>> deleteSentMoment(String momentId);
+
+  Future<Result<int>> getMomentStreak();
 }

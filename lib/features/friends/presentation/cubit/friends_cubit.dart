@@ -2,9 +2,12 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moment/core/errors/failures.dart';
 import 'package:moment/core/result/result.dart';
+import 'package:moment/features/friends/data/datasources/device_contacts_data_source.dart';
+import 'package:moment/features/friends/domain/entities/contact_suggestion.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/friends/domain/repositories/friends_repository.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
+import 'package:moment/features/profile/domain/usecases/profile_usecases.dart';
 
 enum FriendsStatus { initial, loading, loaded, acting, failure }
 
@@ -15,8 +18,12 @@ class FriendsState extends Equatable {
     this.incoming = const [],
     this.outgoing = const [],
     this.suggestions = const [],
+    this.contacts = const [],
+    this.contactsLoaded = false,
+    this.contactsPermissionDenied = false,
     this.searchResults = const [],
     this.searchQuery = '',
+    this.myUsername,
     this.actingOn,
     this.errorMessage,
     this.actionMessage,
@@ -27,8 +34,12 @@ class FriendsState extends Equatable {
   final List<FriendRequest> incoming;
   final List<FriendRequest> outgoing;
   final List<SuggestedFriend> suggestions;
+  final List<ContactSuggestion> contacts;
+  final bool contactsLoaded;
+  final bool contactsPermissionDenied;
   final List<UserSearchResult> searchResults;
   final String searchQuery;
+  final String? myUsername;
   final String? actingOn;
   final String? errorMessage;
   final String? actionMessage;
@@ -43,8 +54,12 @@ class FriendsState extends Equatable {
     List<FriendRequest>? incoming,
     List<FriendRequest>? outgoing,
     List<SuggestedFriend>? suggestions,
+    List<ContactSuggestion>? contacts,
+    bool? contactsLoaded,
+    bool? contactsPermissionDenied,
     List<UserSearchResult>? searchResults,
     String? searchQuery,
+    String? myUsername,
     String? actingOn,
     String? errorMessage,
     String? actionMessage,
@@ -58,8 +73,13 @@ class FriendsState extends Equatable {
       incoming: incoming ?? this.incoming,
       outgoing: outgoing ?? this.outgoing,
       suggestions: suggestions ?? this.suggestions,
+      contacts: contacts ?? this.contacts,
+      contactsLoaded: contactsLoaded ?? this.contactsLoaded,
+      contactsPermissionDenied:
+          contactsPermissionDenied ?? this.contactsPermissionDenied,
       searchResults: searchResults ?? this.searchResults,
       searchQuery: searchQuery ?? this.searchQuery,
+      myUsername: myUsername ?? this.myUsername,
       actingOn: clearActing ? null : actingOn ?? this.actingOn,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       actionMessage: clearActionMessage
@@ -75,8 +95,12 @@ class FriendsState extends Equatable {
     incoming,
     outgoing,
     suggestions,
+    contacts,
+    contactsLoaded,
+    contactsPermissionDenied,
     searchResults,
     searchQuery,
+    myUsername,
     actingOn,
     errorMessage,
     actionMessage,
@@ -84,13 +108,43 @@ class FriendsState extends Equatable {
 }
 
 class FriendsCubit extends Cubit<FriendsState> {
-  FriendsCubit(this._repository) : super(const FriendsState());
+  FriendsCubit(
+    this._repository,
+    this._getCurrentProfile,
+    this._contacts,
+  ) : super(const FriendsState());
 
   final FriendsRepository _repository;
+  final GetCurrentProfileUseCase _getCurrentProfile;
+  final DeviceContactsDataSource _contacts;
 
   Future<void> load() async {
     emit(state.copyWith(status: FriendsStatus.loading, clearError: true));
     await _refreshAll(showLoading: false);
+    await loadContacts();
+  }
+
+  Future<void> loadContacts() async {
+    final granted = await _contacts.requestPermission();
+    if (!granted) {
+      emit(
+        state.copyWith(
+          contactsLoaded: true,
+          contactsPermissionDenied: true,
+          contacts: const [],
+        ),
+      );
+      return;
+    }
+
+    final contacts = await _contacts.loadContacts();
+    emit(
+      state.copyWith(
+        contacts: contacts,
+        contactsLoaded: true,
+        contactsPermissionDenied: false,
+      ),
+    );
   }
 
   void clearMessages() {
@@ -327,16 +381,29 @@ class FriendsCubit extends Cubit<FriendsState> {
       emit(state.copyWith(status: FriendsStatus.loading, clearError: true));
     }
 
-    final friendsResult = await _repository.getFriends();
-    final incomingResult = await _repository.getIncomingRequests();
-    final outgoingResult = await _repository.getOutgoingRequests();
-    final suggestionsResult = await _repository.getSuggestedFriends();
+    final friendsFuture = _repository.getFriends();
+    final incomingFuture = _repository.getIncomingRequests();
+    final outgoingFuture = _repository.getOutgoingRequests();
+    final suggestionsFuture = _repository.getSuggestedFriends();
+    final profileFuture = _getCurrentProfile();
+
+    final friendsResult = await friendsFuture;
+    final incomingResult = await incomingFuture;
+    final outgoingResult = await outgoingFuture;
+    final suggestionsResult = await suggestionsFuture;
+    final profileResult = await profileFuture;
 
     Failure? failure;
     var friends = state.friends;
     var incoming = state.incoming;
     var outgoing = state.outgoing;
     var suggestions = state.suggestions;
+    var myUsername = state.myUsername;
+
+    profileResult.when(
+      success: (profile) => myUsername = profile.username,
+      failure: (_) {},
+    );
 
     friendsResult.when(
       success: (value) => friends = value,
@@ -372,6 +439,7 @@ class FriendsCubit extends Cubit<FriendsState> {
         incoming: incoming,
         outgoing: outgoing,
         suggestions: suggestions,
+        myUsername: myUsername,
         clearActing: true,
         clearError: true,
       ),
@@ -389,6 +457,9 @@ class FriendProfileState extends Equatable {
     this.pendingRequestId,
     this.errorMessage,
     this.actionMessage,
+    this.shouldRefreshFriendsList = false,
+    this.mutualFriendCount = 0,
+    this.friendsSince,
   });
 
   final FriendProfileStatus status;
@@ -397,6 +468,9 @@ class FriendProfileState extends Equatable {
   final String? pendingRequestId;
   final String? errorMessage;
   final String? actionMessage;
+  final bool shouldRefreshFriendsList;
+  final int mutualFriendCount;
+  final DateTime? friendsSince;
 
   FriendProfileState copyWith({
     FriendProfileStatus? status,
@@ -405,7 +479,11 @@ class FriendProfileState extends Equatable {
     String? pendingRequestId,
     String? errorMessage,
     String? actionMessage,
+    bool? shouldRefreshFriendsList,
+    int? mutualFriendCount,
+    DateTime? friendsSince,
     bool clearMessages = false,
+    bool clearRefreshFriendsList = false,
   }) {
     return FriendProfileState(
       status: status ?? this.status,
@@ -414,6 +492,11 @@ class FriendProfileState extends Equatable {
       pendingRequestId: pendingRequestId ?? this.pendingRequestId,
       errorMessage: clearMessages ? null : errorMessage ?? this.errorMessage,
       actionMessage: clearMessages ? null : actionMessage ?? this.actionMessage,
+      shouldRefreshFriendsList: clearRefreshFriendsList
+          ? false
+          : shouldRefreshFriendsList ?? this.shouldRefreshFriendsList,
+      mutualFriendCount: mutualFriendCount ?? this.mutualFriendCount,
+      friendsSince: friendsSince ?? this.friendsSince,
     );
   }
 
@@ -425,6 +508,9 @@ class FriendProfileState extends Equatable {
     pendingRequestId,
     errorMessage,
     actionMessage,
+    shouldRefreshFriendsList,
+    mutualFriendCount,
+    friendsSince,
   ];
 }
 
@@ -473,12 +559,25 @@ class FriendProfileCubit extends Cubit<FriendProfileState> {
               pendingRequestId = pendingResult.valueOrNull;
             }
 
+            final mutualResult = await _repository.getMutualFriendCount(
+              _userId,
+            );
+            final mutualCount = mutualResult.valueOrNull ?? 0;
+
+            DateTime? friendsSince;
+            if (relationship == FriendRelationship.friends) {
+              final sinceResult = await _repository.getFriendshipSince(_userId);
+              friendsSince = sinceResult.valueOrNull;
+            }
+
             emit(
               FriendProfileState(
                 status: FriendProfileStatus.loaded,
                 profile: profile,
                 relationship: relationship,
                 pendingRequestId: pendingRequestId,
+                mutualFriendCount: mutualCount,
+                friendsSince: friendsSince,
               ),
             );
         }
@@ -486,11 +585,17 @@ class FriendProfileCubit extends Cubit<FriendProfileState> {
   }
 
   Future<void> sendRequest() async {
-    await _act(() => _repository.sendFriendRequest(_userId));
+    await _act(
+      () => _repository.sendFriendRequest(_userId),
+      refreshFriendsList: true,
+    );
   }
 
   Future<void> acceptRequest(String requestId) async {
-    await _act(() => _repository.acceptFriendRequest(requestId));
+    await _act(
+      () => _repository.acceptFriendRequest(requestId),
+      refreshFriendsList: true,
+    );
   }
 
   Future<void> rejectRequest(String requestId) async {
@@ -498,17 +603,30 @@ class FriendProfileCubit extends Cubit<FriendProfileState> {
   }
 
   Future<void> cancelRequest(String requestId) async {
-    await _act(() => _repository.cancelFriendRequest(requestId));
+    await _act(
+      () => _repository.cancelFriendRequest(requestId),
+      refreshFriendsList: true,
+    );
   }
 
   Future<void> removeFriend() async {
-    await _act(() => _repository.removeFriend(_userId));
+    await _act(
+      () => _repository.removeFriend(_userId),
+      refreshFriendsList: true,
+    );
   }
 
   Future<void> blockUser() async {
     await _act(
       () => _repository.blockUser(_userId),
       successMessage: 'User blocked.',
+    );
+  }
+
+  Future<void> unblockUser() async {
+    await _act(
+      () => _repository.unblockUser(_userId),
+      successMessage: 'User unblocked.',
     );
   }
 
@@ -526,6 +644,7 @@ class FriendProfileCubit extends Cubit<FriendProfileState> {
   Future<void> _act(
     Future<Result<void>> Function() action, {
     String? successMessage,
+    bool refreshFriendsList = false,
   }) async {
     emit(
       state.copyWith(status: FriendProfileStatus.acting, clearMessages: true),
@@ -535,7 +654,11 @@ class FriendProfileCubit extends Cubit<FriendProfileState> {
       case Success():
         await load();
         emit(
-          state.copyWith(actionMessage: successMessage, clearMessages: false),
+          state.copyWith(
+            actionMessage: successMessage,
+            clearMessages: false,
+            shouldRefreshFriendsList: refreshFriendsList,
+          ),
         );
       case Failed(:final failure):
         emit(

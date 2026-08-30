@@ -92,15 +92,8 @@ class MemoryVaultCubit extends Cubit<MemoryVaultState> {
   }
 
   Future<void> refreshDaily() async {
-    final recentResult = await _moments.listReceivedMoments(
-      limit: 40,
-      seenFilter: MomentSeenFilter.seen,
-    );
+    final recent = await _loadCameraRollMoments();
     if (isClosed) return;
-    final recent = switch (recentResult) {
-      Success(:final value) => value,
-      Failed() => state.recentMoments,
-    };
     emit(
       state.copyWith(
         status: MemoryVaultStatus.loaded,
@@ -115,18 +108,11 @@ class MemoryVaultCubit extends Cubit<MemoryVaultState> {
     emit(state.copyWith(status: MemoryVaultStatus.loading, clearError: true));
 
     final vaultResult = await _memories.getMyMemories();
-    final recentResult = await _moments.listReceivedMoments(
-      limit: 40,
-      seenFilter: MomentSeenFilter.seen,
-    );
+    final recent = await _loadCameraRollMoments();
     await _loadCircleMembership();
 
     switch (vaultResult) {
       case Success(:final value):
-        final recent = switch (recentResult) {
-          Success(:final value) => value,
-          Failed() => const <Moment>[],
-        };
         emit(
           state.copyWith(
             status: MemoryVaultStatus.loaded,
@@ -316,6 +302,30 @@ class MemoryVaultCubit extends Cubit<MemoryVaultState> {
         );
         return null;
     }
+  }
+
+  Future<List<Moment>> _loadCameraRollMoments() async {
+    final results = await Future.wait([
+      _moments.listSentMoments(limit: 60),
+      _moments.listReceivedMoments(
+        limit: 60,
+        seenFilter: MomentSeenFilter.all,
+      ),
+    ]);
+
+    final byId = <String, Moment>{};
+    for (final result in results) {
+      final moments = switch (result) {
+        Success(:final value) => value,
+        Failed() => const <Moment>[],
+      };
+      for (final moment in moments) {
+        byId[moment.id] = moment;
+      }
+    }
+
+    return byId.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   Future<void> _loadCircleMembership() async {

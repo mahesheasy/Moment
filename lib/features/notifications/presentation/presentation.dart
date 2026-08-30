@@ -1,2 +1,1 @@
-/// presentation layer placeholder for Version 0.1.
-library;
+export 'cubit/notifications_cubit.dart';

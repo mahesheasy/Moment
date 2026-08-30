@@ -7,13 +7,16 @@ import 'package:moment/app/shell/main_shell.dart';
 import 'package:moment/features/friends/presentation/pages/friend_profile_page.dart';
 import 'package:moment/features/friends/presentation/pages/friends_page.dart';
 import 'package:moment/features/auth/presentation/pages/login_page.dart';
+import 'package:moment/features/auth/presentation/pages/permissions_setup_page.dart';
 import 'package:moment/features/auth/presentation/pages/onboarding_page.dart';
 import 'package:moment/features/auth/presentation/pages/splash_page.dart';
 import 'package:moment/features/circles/presentation/pages/circle_detail_page.dart';
+import 'package:moment/features/circles/presentation/pages/circle_moments_page.dart';
 import 'package:moment/features/circles/presentation/pages/circles_page.dart';
 import 'package:moment/features/memories/presentation/pages/memory_detail_page.dart';
 import 'package:moment/features/memories/presentation/pages/memory_edit_page.dart';
-import 'package:moment/features/memories/presentation/pages/memories_page.dart';
+import 'package:moment/features/chat/presentation/pages/chat_inbox_page.dart';
+import 'package:moment/features/chat/presentation/pages/chat_thread_page.dart';
 import 'package:moment/features/moments/presentation/pages/camera_placeholder_page.dart';
 import 'package:moment/features/moments/presentation/pages/home_page.dart';
 import 'package:moment/features/moments/presentation/pages/moment_detail_page.dart';
@@ -33,8 +36,11 @@ import 'package:moment/features/settings/presentation/pages/notification_setting
 import 'package:moment/features/settings/presentation/pages/notifications_page.dart';
 import 'package:moment/features/settings/presentation/pages/report_problem_page.dart';
 import 'package:moment/features/settings/presentation/pages/settings_page.dart';
+import 'package:moment/app/di/injection.dart';
+import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
 import 'package:moment/core/constants/app_constants.dart';
 import 'package:moment/core/deep_links/deep_link_mapper.dart';
+import 'package:moment/features/profile/domain/entities/user_profile.dart';
 
 GoRouter createAppRouter({
   required SessionCubit sessionCubit,
@@ -72,14 +78,26 @@ GoRouter createAppRouter({
       }
 
       if (status == SessionStatus.authenticated) {
+        final setupComplete =
+            sl<SetupPreferencesLocalCache>().isPermissionsSetupCompleteSync;
+
         if (deepLinkTarget != null && deepLinkTarget != state.matchedLocation) {
           return deepLinkTarget;
         }
+
+        if (!setupComplete && location != AppRoutes.setupPermissions) {
+          return AppRoutes.setupPermissions;
+        }
+
+        if (setupComplete && location == AppRoutes.setupPermissions) {
+          return AppRoutes.home;
+        }
+
         if (location == AppRoutes.login ||
             location == AppRoutes.register ||
             location == AppRoutes.splash ||
             location == AppRoutes.onboarding) {
-          return AppRoutes.home;
+          return setupComplete ? AppRoutes.home : AppRoutes.setupPermissions;
         }
       }
 
@@ -95,6 +113,10 @@ GoRouter createAppRouter({
         builder: (context, state) => const OnboardingPage(),
       ),
       GoRoute(
+        path: AppRoutes.setupPermissions,
+        builder: (context, state) => const PermissionsSetupPage(),
+      ),
+      GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginPage(),
       ),
@@ -108,11 +130,10 @@ GoRouter createAppRouter({
         pageBuilder: (context, state) {
           final circleId = state.uri.queryParameters['circleId'];
           final promptId = state.uri.queryParameters['promptId'];
-          final promptContext = circleId != null && promptId != null
+          final promptContext = circleId != null
               ? CameraPromptContext(
-                  promptId: promptId,
                   circleId: circleId,
-                  promptText: '',
+                  promptId: promptId,
                 )
               : null;
           return CustomTransitionPage<void>(
@@ -134,6 +155,12 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) =>
             MomentDetailPage(momentId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/circles/:id/moments',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) =>
+            CircleMomentsPage(circleId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/circles/:id/today',
@@ -174,6 +201,37 @@ GoRouter createAppRouter({
         builder: (context, state) => const FriendsPage(),
       ),
       GoRoute(
+        path: '/chat/:userId',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId'] ?? '';
+          final otherUser = state.extra;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: ChatThreadPage(
+              userId: userId,
+              otherUser: otherUser is UserProfile ? otherUser : null,
+            ),
+            transitionDuration: const Duration(milliseconds: 320),
+            reverseTransitionDuration: const Duration(milliseconds: 260),
+            transitionsBuilder: (context, animation, secondary, child) {
+              final curve = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.06),
+                  end: Offset.zero,
+                ).animate(curve),
+                child: FadeTransition(opacity: curve, child: child),
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
         path: '/friends/:id',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) =>
@@ -187,7 +245,7 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.notifications,
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const NotificationsPage(),
+        builder: (context, state) => createNotificationsPage(),
       ),
       GoRoute(
         path: AppRoutes.notificationSettings,
@@ -263,8 +321,8 @@ GoRouter createAppRouter({
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.memories,
-                builder: (context, state) => const MemoriesPage(),
+                path: AppRoutes.chat,
+                builder: (context, state) => const ChatInboxPage(),
               ),
             ],
           ),

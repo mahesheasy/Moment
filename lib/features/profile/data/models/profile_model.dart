@@ -7,15 +7,20 @@ class ProfileModel {
     required this.displayName,
     this.avatarUrl,
     this.bio,
+    this.createdAt,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    final createdAtRaw = json['created_at'];
     return ProfileModel(
       id: json['id'] as String,
       username: json['username'] as String,
       displayName: json['display_name'] as String,
       avatarUrl: json['avatar_url'] as String?,
       bio: json['bio'] as String?,
+      createdAt: createdAtRaw is String
+          ? DateTime.parse(createdAtRaw).toUtc()
+          : null,
     );
   }
 
@@ -24,6 +29,7 @@ class ProfileModel {
   final String displayName;
   final String? avatarUrl;
   final String? bio;
+  final DateTime? createdAt;
 
   UserProfile toEntity() {
     return UserProfile(
@@ -32,6 +38,7 @@ class ProfileModel {
       displayName: displayName,
       avatarUrl: avatarUrl,
       bio: bio,
+      createdAt: createdAt,
     );
   }
 }

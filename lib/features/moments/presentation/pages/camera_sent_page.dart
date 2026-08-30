@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
 import 'package:moment/core/theme/app_spacing.dart';
 import 'package:moment/core/widgets/moment_avatar.dart';
+import 'package:moment/core/widgets/moment_hero_tags.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
+import 'package:moment/features/moments/presentation/utils/camera_flow_navigation.dart';
 import 'package:moment/features/moments/presentation/widgets/camera_chrome.dart';
 
 class CameraSentPage extends StatelessWidget {
@@ -18,11 +18,12 @@ class CameraSentPage extends StatelessWidget {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) context.go(AppRoutes.home);
+        if (!didPop) exitCameraFlowToHome(context);
       },
       child: BlocBuilder<CameraCubit, CameraState>(
         builder: (context, state) {
           return Scaffold(
+            backgroundColor: AppColors.backgroundDark,
             body: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -41,9 +42,9 @@ class CameraSentPage extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Spacer(),
-                    Center(child: _SuccessMark()),
-                    SizedBox(height: AppSpacing.xxl),
+                    const Spacer(),
+                    const Center(child: _SuccessMark()),
+                    const SizedBox(height: AppSpacing.xxl),
                     Text(
                       'Moment Sent!',
                       textAlign: TextAlign.center,
@@ -53,24 +54,24 @@ class CameraSentPage extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                     ),
-                    SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.md),
                     _SentToLine(state: state),
-                    Spacer(),
+                    const Spacer(),
                     _DarkActionButton(
                       label: 'View Moment',
                       onTap: () {
                         final id = state.sentMomentId;
                         if (id == null) {
-                          context.go(AppRoutes.home);
+                          exitCameraFlowToHome(context);
                           return;
                         }
-                        context.go(AppRoutes.moment(id));
+                        exitCameraFlowToMoment(context, id);
                       },
                     ),
-                    SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.md),
                     _DarkActionButton(
                       label: 'Back to Home',
-                      onTap: () => context.go(AppRoutes.home),
+                      onTap: () => exitCameraFlowToHome(context),
                     ),
                   ],
                 ),
@@ -88,25 +89,53 @@ class _SuccessMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 128,
-      height: 128,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.violet, AppColors.sendCoral, AppColors.nextPurple],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.violet.withValues(alpha: 0.35),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
+    return Hero(
+      tag: MomentHeroTags.cameraSendSuccess,
+      flightShuttleBuilder: (
+        flightContext,
+        animation,
+        flightDirection,
+        fromHeroContext,
+        toHeroContext,
+      ) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: 0.85 + (animation.value * 0.15),
+              child: child,
+            );
+          },
+          child: toHeroContext.widget,
+        );
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 128,
+          height: 128,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.violet,
+                AppColors.sendCoral,
+                AppColors.nextPurple,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.violet.withValues(alpha: 0.35),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
+          child: const Icon(AppIcons.check, color: Colors.white, size: 64),
+        ),
       ),
-      child: Icon(AppIcons.check, color: Colors.white, size: 64),
     );
   }
 }

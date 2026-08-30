@@ -45,6 +45,16 @@ class _HomeWidgetStudioViewState extends State<_HomeWidgetStudioView> {
   var _backgroundTint = 0.35;
   var _isPinning = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(sl<HomeWidgetSyncService>().sync());
+      });
+    }
+  }
+
   double _previewSizeFor(WidgetDisplaySize size) => switch (size) {
     WidgetDisplaySize.large => 200,
     WidgetDisplaySize.medium => 160,
@@ -57,7 +67,10 @@ class _HomeWidgetStudioViewState extends State<_HomeWidgetStudioView> {
     if (!mounted) return;
     if (Platform.isAndroid) {
       final pinned = await sl<AndroidWidgetBridge>().requestPinToHomeScreen();
-      if (pinned) await sl<HomeWidgetSyncService>().sync();
+      if (pinned) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (mounted) await sl<HomeWidgetSyncService>().sync();
+      }
     }
     if (!mounted) return;
     setState(() => _isPinning = false);
@@ -137,16 +150,31 @@ class _HomeWidgetStudioViewState extends State<_HomeWidgetStudioView> {
                           borderRadius: BorderRadius.circular(16),
                           child: WidgetStylePreview(
                             preferences: draft.copyWith(showCaptions: true),
+                            stackMoments: state.previewStackMoments.isEmpty
+                                ? null
+                                : state.previewStackMoments,
                             headerTitle: previewTitle,
-                            relativeTime: 'Just now',
-                            studioPreview: true,
+                            relativeTime: state.previewStackMoments.isNotEmpty
+                                ? state.previewStackMoments.first.relativeTime
+                                : 'Just now',
+                            studioPreview: draft.displaySize != WidgetDisplaySize.small,
+                            locketPreview: draft.displaySize == WidgetDisplaySize.small,
                             borderless: true,
                             backgroundTint: _backgroundTint,
                             cornerRadius: 16,
                             previewSize: previewSize,
+                            streakCount: state.previewStreakCount,
                           ),
                         ),
                       ),
+                      if (state.previewStackMoments.length > 1) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Swipe the preview to browse your moment stack',
+                          style: SettingsType.caption(AppColors.textTertiaryDark),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                       const SizedBox(height: 28),
                       _SectionLabel('Widget style'),
                       const SizedBox(height: 10),

@@ -9,16 +9,19 @@ import android.content.Intent
 import android.os.SystemClock
 
 object WidgetTimeRefresh {
-    private const val INTERVAL_MS = 15 * 60 * 1000L
+    /** Refresh relative timestamps ("8m ago" → "9m ago") about every minute. */
+    private const val INTERVAL_MS = 60_000L
 
     fun schedule(context: Context) {
         val manager = context.getSystemService(AlarmManager::class.java) ?: return
-        manager.setInexactRepeating(
-            AlarmManager.ELAPSED_REALTIME,
-            SystemClock.elapsedRealtime() + INTERVAL_MS,
-            INTERVAL_MS,
-            pendingIntent(context),
-        )
+        runCatching {
+            manager.setInexactRepeating(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + INTERVAL_MS,
+                INTERVAL_MS,
+                pendingIntent(context),
+            )
+        }
     }
 
     fun cancel(context: Context) {

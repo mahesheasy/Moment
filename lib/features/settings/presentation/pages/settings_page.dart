@@ -69,7 +69,11 @@ class _SettingsView extends StatelessWidget {
               title: 'Widget',
               children: [
                 SettingsNavRow(
-                  label: 'Widget settings',
+                  label: 'Widget setup',
+                  onTap: () => context.push(AppRoutes.widgetSettings),
+                ),
+                SettingsNavRow(
+                  label: 'Widget customize',
                   onTap: () => context.push(AppRoutes.widgetCustomize),
                 ),
                 SettingsNavRow(

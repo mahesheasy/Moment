@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moment/app/di/injection.dart';
+import 'package:moment/core/navigation/memories_overlay_controller.dart';
 import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/theme/app_breakpoints.dart';
 import 'package:moment/core/theme/app_colors.dart';
@@ -92,7 +93,7 @@ class _ProfileView extends StatelessWidget {
                       },
                       onPeopleTap: () => context.push(AppRoutes.friends),
                       onCirclesTap: () => context.go(AppRoutes.circles),
-                      onMemoriesTap: () => context.go(AppRoutes.memories),
+                      onMemoriesTap: () => sl<MemoriesOverlayController>().open(),
                     ),
                     SizedBox(height: AppSpacing.xxl),
                     const _ProfileSectionLabel('Account'),

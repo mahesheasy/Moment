@@ -1,39 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
 import 'package:moment/core/theme/app_spacing.dart';
+import 'package:moment/core/utils/relative_time.dart';
 import 'package:moment/core/widgets/moment_avatar.dart';
 import 'package:moment/core/widgets/moment_scaffold.dart';
+import 'package:moment/features/notifications/domain/entities/app_notification.dart';
+import 'package:moment/features/notifications/presentation/cubit/notifications_cubit.dart';
+import 'package:moment/features/notifications/presentation/widgets/notification_swipe_tile.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
-
-enum _NotificationFilter { all, mentions, updates, system }
-
-enum AppNotificationType { friendRequest, like, mention, friendJoined, memory, security, badge }
-
-class AppNotificationItem {
-  const AppNotificationItem({
-    required this.id,
-    required this.type,
-    required this.title,
-    required this.body,
-    required this.timeAgo,
-    required this.isUnread,
-    this.avatarName,
-    this.avatarUrl,
-  });
-
-  final String id;
-  final AppNotificationType type;
-  final String title;
-  final String body;
-  final String timeAgo;
-  final bool isUnread;
-  final String? avatarName;
-  final String? avatarUrl;
-}
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -43,158 +22,215 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  _NotificationFilter _filter = _NotificationFilter.all;
+  @override
+  void initState() {
+    super.initState();
+    context.read<NotificationsCubit>().start();
+  }
 
-  static const _items = [
-    AppNotificationItem(
-      id: '1',
-      type: AppNotificationType.friendRequest,
-      title: 'Mahesh',
-      body: 'sent you a friend request.',
-      timeAgo: '2m ago',
-      isUnread: true,
-      avatarName: 'Mahesh',
-    ),
-    AppNotificationItem(
-      id: '2',
-      type: AppNotificationType.like,
-      title: 'Sneha',
-      body: 'liked your moment.',
-      timeAgo: '15m ago',
-      isUnread: true,
-      avatarName: 'Sneha',
-    ),
-    AppNotificationItem(
-      id: '3',
-      type: AppNotificationType.mention,
-      title: 'Arjun',
-      body: 'mentioned you in a moment.',
-      timeAgo: '1h ago',
-      isUnread: true,
-      avatarName: 'Arjun',
-    ),
-    AppNotificationItem(
-      id: '4',
-      type: AppNotificationType.friendJoined,
-      title: 'Jay',
-      body: 'joined Moment.',
-      timeAgo: '3h ago',
-      isUnread: false,
-      avatarName: 'Jay',
-    ),
-    AppNotificationItem(
-      id: '5',
-      type: AppNotificationType.memory,
-      title: 'Goa Trip',
-      body: 'Your memory is ready to view.',
-      timeAgo: '5h ago',
-      isUnread: false,
-    ),
-    AppNotificationItem(
-      id: '6',
-      type: AppNotificationType.security,
-      title: 'Security',
-      body: 'Two-factor authentication is now enabled.',
-      timeAgo: '1d ago',
-      isUnread: false,
-    ),
-    AppNotificationItem(
-      id: '7',
-      type: AppNotificationType.badge,
-      title: 'Memory Keeper',
-      body: "You earned a new badge 🎉",
-      timeAgo: '2d ago',
-      isUnread: false,
-    ),
-  ];
+  void _onNotificationTap(AppNotification item) {
+    final cubit = context.read<NotificationsCubit>();
+    cubit.markRead(item.id);
 
-  List<AppNotificationItem> get _filtered {
-    return switch (_filter) {
-      _NotificationFilter.all => _items,
-      _NotificationFilter.mentions =>
-        _items.where((n) => n.type == AppNotificationType.mention).toList(),
-      _NotificationFilter.updates => _items
-          .where(
-            (n) =>
-                n.type == AppNotificationType.like ||
-                n.type == AppNotificationType.memory ||
-                n.type == AppNotificationType.friendJoined ||
-                n.type == AppNotificationType.badge,
-          )
-          .toList(),
-      _NotificationFilter.system => _items
-          .where(
-            (n) =>
-                n.type == AppNotificationType.security ||
-                n.type == AppNotificationType.friendRequest,
-          )
-          .toList(),
-    };
+    switch (item.target) {
+      case FriendNotificationTarget(:final userId):
+        context.push(AppRoutes.friend(userId));
+      case MomentNotificationTarget(:final momentId):
+        context.push(AppRoutes.moment(momentId));
+      case ChatNotificationTarget(:final userId):
+        context.push(AppRoutes.chatThread(userId));
+    }
+  }
+
+  void _dismissNotification(AppNotification item) {
+    context.read<NotificationsCubit>().dismiss(item.id);
+  }
+
+  Future<void> _showNotificationOptions(AppNotification item) async {
+    final cubit = context.read<NotificationsCubit>();
+
+    final action = await showModalBottomSheet<_NotificationSheetAction>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (item.isUnread)
+                _NotificationSheetTile(
+                  label: 'Mark as read',
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    _NotificationSheetAction.markRead,
+                  ),
+                ),
+              _NotificationSheetTile(
+                label: 'Not interested',
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  _NotificationSheetAction.notInterested,
+                ),
+              ),
+              _NotificationSheetTile(
+                label: 'Turn off notifications like this',
+                onTap: () => Navigator.pop(
+                  sheetContext,
+                  _NotificationSheetAction.turnOffType,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _NotificationSheetAction.markRead:
+        await cubit.markRead(item.id);
+      case _NotificationSheetAction.notInterested:
+        await cubit.dismiss(item.id);
+      case _NotificationSheetAction.turnOffType:
+        if (mounted) await context.push(AppRoutes.notificationSettings);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
-    final unread = filtered.where((n) => n.isUnread).toList();
-    final earlier = filtered.where((n) => !n.isUnread).toList();
+    return BlocBuilder<NotificationsCubit, NotificationsState>(
+      builder: (context, state) {
+        final filtered = state.filteredItems;
+        final unread = filtered.where((n) => n.isUnread).toList();
+        final earlier = filtered.where((n) => !n.isUnread).toList();
 
-    return MomentScaffold(
-      appBar: MomentAppBar(
-        leading: IconButton(
-          icon: Icon(AppIcons.back, size: 18),
-          onPressed: () => context.pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings_outlined, size: 20),
-            onPressed: () => context.push(AppRoutes.notificationSettings),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          0,
-          AppSpacing.lg,
-          AppSpacing.huge,
-        ),
-        children: [
-          Text(
-            'Notifications',
-            style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
+        return MomentScaffold(
+          appBar: MomentAppBar(
+            leading: IconButton(
+              icon: Icon(AppIcons.back, size: 18),
+              onPressed: () => context.pop(),
             ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Stay updated with what matters.',
-            style: SettingsType.body(AppColors.textTertiaryDark),
-          ),
-          SizedBox(height: AppSpacing.lg),
-          _FilterRow(
-            filter: _filter,
-            onChanged: (f) => setState(() => _filter = f),
-          ),
-          SizedBox(height: AppSpacing.lg),
-          if (filtered.isEmpty)
-            const _CaughtUpCard()
-          else ...[
-            if (unread.isNotEmpty) ...[
-              _SectionLabel(label: 'New'),
-              SizedBox(height: AppSpacing.sm),
-              _NotificationGroup(items: unread),
-              SizedBox(height: AppSpacing.xl),
+            actions: [
+              if (state.unreadCount > 0)
+                TextButton(
+                  onPressed: () =>
+                      context.read<NotificationsCubit>().markAllRead(),
+                  child: Text(
+                    'Mark all read',
+                    style: SettingsType.caption(AppColors.violet)
+                        .copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              IconButton(
+                icon: Icon(Icons.settings_outlined, size: 20),
+                onPressed: () => context.push(AppRoutes.notificationSettings),
+              ),
             ],
-            if (earlier.isNotEmpty) ...[
-              _SectionLabel(label: 'Earlier'),
-              SizedBox(height: AppSpacing.sm),
-              _NotificationGroup(items: earlier),
-            ],
-            SizedBox(height: AppSpacing.xl),
-            const _CaughtUpCard(),
+          ),
+          body: switch (state.status) {
+            NotificationsStatus.initial ||
+            NotificationsStatus.loading when state.items.isEmpty =>
+              const Center(child: CircularProgressIndicator()),
+            NotificationsStatus.error when state.items.isEmpty =>
+              _ErrorState(message: state.errorMessage),
+            _ => RefreshIndicator(
+                onRefresh: () =>
+                    context.read<NotificationsCubit>().refresh(),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    0,
+                    AppSpacing.lg,
+                    AppSpacing.huge,
+                  ),
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: SettingsType.title(AppColors.textPrimaryDark)
+                          .copyWith(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Stay updated with what matters.',
+                      style: SettingsType.body(AppColors.textTertiaryDark),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _FilterRow(
+                      filter: state.filter,
+                      onChanged: context.read<NotificationsCubit>().setFilter,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (filtered.isEmpty)
+                      const _CaughtUpCard()
+                    else ...[
+                      if (unread.isNotEmpty) ...[
+                        const _SectionLabel(label: 'New'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _NotificationGroup(
+                          items: unread,
+                          onTap: _onNotificationTap,
+                          onMore: _showNotificationOptions,
+                          onDelete: _dismissNotification,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                      ],
+                      if (earlier.isNotEmpty) ...[
+                        const _SectionLabel(label: 'Earlier'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _NotificationGroup(
+                          items: earlier,
+                          onTap: _onNotificationTap,
+                          onMore: _showNotificationOptions,
+                          onDelete: _dismissNotification,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.xl),
+                      const _CaughtUpCard(),
+                    ],
+                  ],
+                ),
+              ),
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({this.message});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message ?? 'Could not load notifications.',
+              textAlign: TextAlign.center,
+              style: SettingsType.body(AppColors.textSecondaryDark),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton(
+              onPressed: () => context.read<NotificationsCubit>().refresh(),
+              child: const Text('Try again'),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -203,8 +239,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 class _FilterRow extends StatelessWidget {
   const _FilterRow({required this.filter, required this.onChanged});
 
-  final _NotificationFilter filter;
-  final ValueChanged<_NotificationFilter> onChanged;
+  final AppNotificationFilter filter;
+  final ValueChanged<AppNotificationFilter> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -215,29 +251,29 @@ class _FilterRow extends StatelessWidget {
           _FilterChip(
             label: 'All',
             icon: Icons.notifications_none_rounded,
-            selected: filter == _NotificationFilter.all,
-            onTap: () => onChanged(_NotificationFilter.all),
+            selected: filter == AppNotificationFilter.all,
+            onTap: () => onChanged(AppNotificationFilter.all),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _FilterChip(
             label: 'Mentions',
             icon: Icons.alternate_email_rounded,
-            selected: filter == _NotificationFilter.mentions,
-            onTap: () => onChanged(_NotificationFilter.mentions),
+            selected: filter == AppNotificationFilter.mentions,
+            onTap: () => onChanged(AppNotificationFilter.mentions),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _FilterChip(
             label: 'Updates',
             icon: Icons.campaign_outlined,
-            selected: filter == _NotificationFilter.updates,
-            onTap: () => onChanged(_NotificationFilter.updates),
+            selected: filter == AppNotificationFilter.updates,
+            onTap: () => onChanged(AppNotificationFilter.updates),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           _FilterChip(
             label: 'System',
             icon: Icons.settings_outlined,
-            selected: filter == _NotificationFilter.system,
-            onTap: () => onChanged(_NotificationFilter.system),
+            selected: filter == AppNotificationFilter.system,
+            onTap: () => onChanged(AppNotificationFilter.system),
           ),
         ],
       ),
@@ -281,7 +317,7 @@ class _FilterChip extends StatelessWidget {
               size: 14,
               color: selected ? Colors.white : AppColors.textTertiaryDark,
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(
               label,
               style: SettingsType.caption(
@@ -311,39 +347,44 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _NotificationGroup extends StatelessWidget {
-  const _NotificationGroup({required this.items});
+  const _NotificationGroup({
+    required this.items,
+    required this.onTap,
+    required this.onMore,
+    required this.onDelete,
+  });
 
-  final List<AppNotificationItem> items;
+  final List<AppNotification> items;
+  final ValueChanged<AppNotification> onTap;
+  final ValueChanged<AppNotification> onMore;
+  final ValueChanged<AppNotification> onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
         color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderDark.withValues(alpha: 0.8)),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0)
-              Divider(
-                height: 1,
-                color: AppColors.borderDark.withValues(alpha: 0.6),
-                indent: 64,
+        child: Column(
+          children: [
+            for (var i = 0; i < items.length; i++)
+              NotificationSwipeTile(
+                onTap: () => onTap(items[i]),
+                onMore: () => onMore(items[i]),
+                onDelete: () => onDelete(items[i]),
+                child: _NotificationTileContent(item: items[i]),
               ),
-            _NotificationTile(item: items[i]),
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.item});
+class _NotificationTileContent extends StatelessWidget {
+  const _NotificationTileContent({required this.item});
 
-  final AppNotificationItem item;
+  final AppNotification item;
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +394,7 @@ class _NotificationTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NotificationLeading(item: item),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,9 +414,9 @@ class _NotificationTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  item.timeAgo,
+                  relativeTimeAgo(item.createdAt),
                   style: SettingsType.caption(AppColors.textTertiaryDark),
                 ),
               ],
@@ -400,7 +441,7 @@ class _NotificationTile extends StatelessWidget {
 class _NotificationLeading extends StatelessWidget {
   const _NotificationLeading({required this.item});
 
-  final AppNotificationItem item;
+  final AppNotification item;
 
   @override
   Widget build(BuildContext context) {
@@ -449,12 +490,11 @@ class _NotificationLeading extends StatelessWidget {
   IconData _typeIcon(AppNotificationType type) {
     return switch (type) {
       AppNotificationType.friendRequest => Icons.person_add_alt_1_rounded,
-      AppNotificationType.like => Icons.favorite_rounded,
-      AppNotificationType.mention => Icons.chat_bubble_rounded,
+      AppNotificationType.reaction => Icons.favorite_rounded,
+      AppNotificationType.moment => Icons.photo_camera_rounded,
+      AppNotificationType.ping => Icons.chat_bubble_rounded,
+      AppNotificationType.chat => Icons.chat_rounded,
       AppNotificationType.friendJoined => Icons.people_rounded,
-      AppNotificationType.memory => Icons.notifications_none_rounded,
-      AppNotificationType.security => Icons.verified_user_outlined,
-      AppNotificationType.badge => Icons.card_giftcard_rounded,
     };
   }
 }
@@ -469,7 +509,6 @@ class _CaughtUpCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderDark.withValues(alpha: 0.8)),
       ),
       child: Row(
         children: [
@@ -488,7 +527,7 @@ class _CaughtUpCard extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,7 +537,7 @@ class _CaughtUpCard extends StatelessWidget {
                   style: SettingsType.title(AppColors.textPrimaryDark)
                       .copyWith(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   "We'll notify you when something new happens.",
                   style: SettingsType.caption(AppColors.textTertiaryDark),
@@ -508,6 +547,41 @@ class _CaughtUpCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Widget createNotificationsPage() {
+  return BlocProvider(
+    create: (_) => sl<NotificationsCubit>(),
+    child: const NotificationsPage(),
+  );
+}
+
+enum _NotificationSheetAction { markRead, notInterested, turnOffType }
+
+class _NotificationSheetTile extends StatelessWidget {
+  const _NotificationSheetTile({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      title: Text(
+        label,
+        style: SettingsType.body(AppColors.textPrimaryDark).copyWith(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }

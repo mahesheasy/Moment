@@ -8,9 +8,21 @@ import java.io.FileOutputStream
 object WidgetBitmap {
     private const val MAX_SIZE = 480
 
-    fun blur(source: Bitmap): Bitmap {
-        val width = (source.width / 12).coerceAtLeast(8)
-        val height = (source.height / 12).coerceAtLeast(8)
+    fun blur(source: Bitmap): Bitmap = blur(source, 1f)
+
+    /** [strength] 0 = clear, 1 = full privacy blur. */
+    fun blur(source: Bitmap, strength: Float): Bitmap {
+        val amount = strength.coerceIn(0f, 1f)
+        if (amount <= 0.001f) return source
+        if (amount >= 0.999f) {
+            val width = (source.width / 12).coerceAtLeast(8)
+            val height = (source.height / 12).coerceAtLeast(8)
+            val small = Bitmap.createScaledBitmap(source, width, height, true)
+            return Bitmap.createScaledBitmap(small, source.width, source.height, true)
+        }
+        val divisor = 12f - (11f * amount)
+        val width = (source.width / divisor).toInt().coerceAtLeast(8)
+        val height = (source.height / divisor).toInt().coerceAtLeast(8)
         val small = Bitmap.createScaledBitmap(source, width, height, true)
         return Bitmap.createScaledBitmap(small, source.width, source.height, true)
     }

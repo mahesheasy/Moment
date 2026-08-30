@@ -8,6 +8,7 @@ import 'package:moment/core/deep_links/deep_link_mapper.dart';
 import 'package:moment/core/errors/exception_mapper.dart';
 import 'package:moment/core/firebase/firebase_bootstrap.dart';
 import 'package:moment/core/logging/app_logger.dart';
+import 'package:moment/core/navigation/memories_overlay_controller.dart';
 import 'package:moment/core/network/network_client.dart';
 import 'package:moment/core/push/push_bridge.dart';
 import 'package:moment/core/push/push_registration_service.dart';
@@ -15,36 +16,20 @@ import 'package:moment/core/realtime/moment_realtime_subscriber.dart';
 import 'package:moment/core/supabase/supabase_bootstrap.dart';
 import 'package:moment/core/widget/android_widget_bridge.dart';
 import 'package:moment/core/widget/home_widget_sync_service.dart';
-import 'package:moment/features/moments/data/datasources/social_remote_data_source.dart';
-import 'package:moment/features/moments/data/repositories/social_repository_impl.dart';
-import 'package:moment/features/moments/domain/repositories/social_repository.dart';
-import 'package:moment/features/moments/data/datasources/moments_remote_data_source.dart';
-import 'package:moment/features/moments/data/repositories/moment_repository_impl.dart';
-import 'package:moment/features/moments/domain/repositories/moment_repository.dart';
-import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
-import 'package:moment/features/moments/presentation/cubit/pings_cubit.dart';
-import 'package:moment/features/memories/data/datasources/memories_remote_data_source.dart';
-import 'package:moment/features/memories/data/repositories/memory_repository_impl.dart';
-import 'package:moment/features/memories/domain/repositories/memory_repository.dart';
-import 'package:moment/features/memories/presentation/cubit/memory_cubit.dart';
-import 'package:moment/features/prompts/data/datasources/prompts_remote_data_source.dart';
-import 'package:moment/features/prompts/data/repositories/prompt_repository_impl.dart';
-import 'package:moment/features/prompts/domain/entities/camera_prompt_context.dart';
-import 'package:moment/features/prompts/domain/repositories/prompt_repository.dart';
-import 'package:moment/features/prompts/presentation/cubit/prompt_cubit.dart';
-import 'package:moment/features/time_travel/data/datasources/time_travel_remote_data_source.dart';
-import 'package:moment/features/time_travel/data/repositories/time_travel_repository_impl.dart';
-import 'package:moment/features/time_travel/domain/repositories/time_travel_repository.dart';
-import 'package:moment/features/time_travel/presentation/cubit/time_travel_cubit.dart';
-import 'package:moment/features/subscription/data/datasources/subscription_remote_data_source.dart';
-import 'package:moment/features/subscription/data/repositories/subscription_repository_impl.dart';
-import 'package:moment/features/subscription/domain/repositories/subscription_repository.dart';
-import 'package:moment/features/subscription/presentation/cubit/premium_cubit.dart';
-import 'package:moment/features/widget_preferences/data/datasources/widget_preferences_local_cache.dart';
-import 'package:moment/features/widget_preferences/data/datasources/widget_preferences_remote_data_source.dart';
-import 'package:moment/features/widget_preferences/data/repositories/widget_preferences_repository_impl.dart';
-import 'package:moment/features/widget_preferences/domain/repositories/widget_preferences_repository.dart';
-import 'package:moment/features/widget_preferences/presentation/cubit/widget_customization_cubit.dart';
+import 'package:moment/core/widget/widget_moment_stream_service.dart';
+import 'package:moment/features/auth/data/app_permissions_service.dart';
+import 'package:moment/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
+import 'package:moment/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:moment/features/auth/domain/repositories/auth_repository.dart';
+import 'package:moment/features/auth/domain/usecases/auth_usecases.dart';
+import 'package:moment/features/auth/presentation/cubit/auth_form_cubit.dart';
+import 'package:moment/features/chat/data/chat_media_resolver.dart';
+import 'package:moment/features/chat/data/datasources/chat_remote_data_source.dart';
+import 'package:moment/features/chat/data/repositories/chat_repository_impl.dart';
+import 'package:moment/features/chat/domain/repositories/chat_repository.dart';
+import 'package:moment/features/chat/presentation/cubit/chat_inbox_cubit.dart';
+import 'package:moment/features/chat/presentation/cubit/chat_thread_cubit.dart';
 import 'package:moment/features/circles/data/circle_image_resolver.dart';
 import 'package:moment/features/circles/data/datasources/circles_remote_data_source.dart';
 import 'package:moment/features/circles/data/repositories/circle_repository_impl.dart';
@@ -52,29 +37,61 @@ import 'package:moment/features/circles/domain/repositories/circle_repository.da
 import 'package:moment/features/circles/presentation/circles_list_refresh.dart';
 import 'package:moment/features/circles/presentation/cubit/circle_detail_cubit.dart';
 import 'package:moment/features/circles/presentation/cubit/circles_cubit.dart';
+import 'package:moment/features/friends/data/datasources/device_contacts_data_source.dart';
 import 'package:moment/features/friends/data/datasources/friends_remote_data_source.dart';
 import 'package:moment/features/friends/data/repositories/friends_repository_impl.dart';
 import 'package:moment/features/friends/domain/repositories/friends_repository.dart';
 import 'package:moment/features/friends/presentation/cubit/friends_cubit.dart';
-import 'package:moment/features/auth/data/datasources/auth_remote_data_source.dart';
-import 'package:moment/features/auth/data/repositories/auth_repository_impl.dart';
-import 'package:moment/features/auth/domain/repositories/auth_repository.dart';
-import 'package:moment/features/auth/domain/usecases/auth_usecases.dart';
-import 'package:moment/features/auth/presentation/cubit/auth_form_cubit.dart';
+import 'package:moment/features/memories/data/datasources/memories_remote_data_source.dart';
+import 'package:moment/features/memories/data/repositories/memory_repository_impl.dart';
+import 'package:moment/features/memories/domain/repositories/memory_repository.dart';
+import 'package:moment/features/memories/presentation/cubit/memory_cubit.dart';
+import 'package:moment/features/moments/data/datasources/moments_remote_data_source.dart';
+import 'package:moment/features/moments/data/datasources/social_remote_data_source.dart';
+import 'package:moment/features/moments/data/repositories/moment_repository_impl.dart';
+import 'package:moment/features/moments/data/repositories/social_repository_impl.dart';
+import 'package:moment/features/moments/domain/repositories/moment_repository.dart';
+import 'package:moment/features/moments/domain/repositories/social_repository.dart';
+import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
+import 'package:moment/features/moments/presentation/cubit/pings_cubit.dart';
+import 'package:moment/features/notifications/data/datasources/notifications_read_local_cache.dart';
+import 'package:moment/features/notifications/data/datasources/notifications_remote_data_source.dart';
+import 'package:moment/features/notifications/data/repositories/notifications_repository_impl.dart';
+import 'package:moment/features/notifications/domain/repositories/notifications_repository.dart';
+import 'package:moment/features/notifications/presentation/cubit/notifications_cubit.dart';
 import 'package:moment/features/profile/data/avatar_url_resolver.dart';
 import 'package:moment/features/profile/data/datasources/profile_remote_data_source.dart';
 import 'package:moment/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:moment/features/profile/domain/entities/user_profile.dart';
 import 'package:moment/features/profile/domain/repositories/profile_repository.dart';
 import 'package:moment/features/profile/domain/usecases/profile_usecases.dart';
 import 'package:moment/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:moment/features/prompts/data/datasources/prompts_remote_data_source.dart';
+import 'package:moment/features/prompts/data/repositories/prompt_repository_impl.dart';
+import 'package:moment/features/prompts/domain/entities/camera_prompt_context.dart';
+import 'package:moment/features/prompts/domain/repositories/prompt_repository.dart';
+import 'package:moment/features/prompts/presentation/cubit/prompt_cubit.dart';
+import 'package:moment/features/settings/data/datasources/appearance_preferences_local_cache.dart';
+import 'package:moment/features/settings/data/datasources/notification_preferences_local_cache.dart';
 import 'package:moment/features/settings/data/datasources/support_remote_data_source.dart';
 import 'package:moment/features/settings/data/repositories/support_repository_impl.dart';
 import 'package:moment/features/settings/domain/repositories/support_repository.dart';
-import 'package:moment/features/settings/data/datasources/appearance_preferences_local_cache.dart';
-import 'package:moment/features/settings/data/datasources/notification_preferences_local_cache.dart';
 import 'package:moment/features/settings/presentation/cubit/appearance_cubit.dart';
 import 'package:moment/features/settings/presentation/cubit/notification_settings_cubit.dart';
 import 'package:moment/features/settings/presentation/cubit/report_problem_cubit.dart';
+import 'package:moment/features/subscription/data/datasources/subscription_remote_data_source.dart';
+import 'package:moment/features/subscription/data/repositories/subscription_repository_impl.dart';
+import 'package:moment/features/subscription/domain/repositories/subscription_repository.dart';
+import 'package:moment/features/subscription/presentation/cubit/premium_cubit.dart';
+import 'package:moment/features/time_travel/data/datasources/time_travel_remote_data_source.dart';
+import 'package:moment/features/time_travel/data/repositories/time_travel_repository_impl.dart';
+import 'package:moment/features/time_travel/domain/repositories/time_travel_repository.dart';
+import 'package:moment/features/time_travel/presentation/cubit/time_travel_cubit.dart';
+import 'package:moment/features/widget_preferences/data/datasources/widget_preferences_local_cache.dart';
+import 'package:moment/features/widget_preferences/data/datasources/widget_preferences_remote_data_source.dart';
+import 'package:moment/features/widget_preferences/data/repositories/widget_preferences_repository_impl.dart';
+import 'package:moment/features/widget_preferences/domain/repositories/widget_preferences_repository.dart';
+import 'package:moment/features/widget_preferences/presentation/cubit/widget_customization_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final GetIt sl = GetIt.instance;
@@ -171,7 +188,7 @@ Future<void> configureDependencies({
   }
 
   sl.registerLazySingleton<CirclesRemoteDataSource>(
-    () => CirclesRemoteDataSource(sl(), sl()),
+    () => CirclesRemoteDataSource(sl(), sl(), sl()),
   );
   sl.registerLazySingleton<CircleRepository>(
     () => CircleRepositoryImpl(
@@ -189,6 +206,23 @@ Future<void> configureDependencies({
   sl.registerLazySingleton<MemoriesRemoteDataSource>(
     () => MemoriesRemoteDataSource(sl()),
   );
+  sl.registerLazySingleton<ChatRemoteDataSource>(
+    () => ChatRemoteDataSource(sl(), sl()),
+  );
+  sl.registerLazySingleton<ChatMediaResolver>(
+    () => ChatMediaResolver(sl()),
+  );
+  sl.registerLazySingleton<ChatRepository>(
+    () => ChatRepositoryImpl(sl(), sl()),
+  );
+  sl
+    ..registerLazySingleton(NotificationsReadLocalCache.new)
+    ..registerLazySingleton<NotificationsRemoteDataSource>(
+      () => NotificationsRemoteDataSource(sl()),
+    )
+    ..registerLazySingleton<NotificationsRepository>(
+      () => NotificationsRepositoryImpl(sl(), sl(), sl(), sl()),
+    );
   sl.registerLazySingleton<MemoryRepository>(
     () => MemoryRepositoryImpl(
       sl(),
@@ -235,15 +269,21 @@ Future<void> configureDependencies({
   );
 
   sl
+    ..registerLazySingleton(SetupPreferencesLocalCache.new)
+    ..registerLazySingleton(AppPermissionsService.new)
+    ..registerLazySingleton(MemoriesOverlayController.new)
     ..registerLazySingleton(AndroidWidgetBridge.new)
     ..registerLazySingleton(WidgetPreferencesLocalCache.new)
     ..registerLazySingleton(NotificationPreferencesLocalCache.new)
     ..registerLazySingleton(AppearancePreferencesLocalCache.new)
     ..registerLazySingleton(PushBridge.new)
     ..registerLazySingleton(
-      () => PushRegistrationService(sl(), sl<SupabaseClient>(), sl()),
+      () => PushRegistrationService(sl(), sl<SupabaseClient>(), sl(), sl(), sl<AppEnv>()),
     )
     ..registerLazySingleton(() => HomeWidgetSyncService(sl(), sl(), sl(), sl(), sl()))
+    ..registerLazySingleton(
+      () => WidgetMomentStreamService(sl(), sl(), sl(), sl(), sl(), sl()),
+    )
     ..registerLazySingleton(
       () => MomentRealtimeSubscriber(
         sl<SupabaseClient>(),
@@ -270,7 +310,8 @@ Future<void> configureDependencies({
     ..registerFactory(() => RegisterCubit(sl()))
     ..registerFactory(() => ProfileCubit(sl(), sl(), sl(), sl(), sl(), sl()))
     ..registerFactory(() => AccountCubit(sl(), sl(), sl()))
-    ..registerFactory(() => FriendsCubit(sl()))
+    ..registerLazySingleton(() => const DeviceContactsDataSource())
+    ..registerFactory(() => FriendsCubit(sl(), sl(), sl()))
     ..registerFactoryParam<FriendProfileCubit, String, void>(
       (userId, _) => FriendProfileCubit(sl(), userId),
     )
@@ -291,11 +332,16 @@ Future<void> configureDependencies({
     ..registerFactoryParam<CircleTodayCubit, String, void>(
       (circleId, _) => CircleTodayCubit(sl(), sl(), sl(), circleId),
     )
+    ..registerLazySingleton(() => ChatInboxCubit(sl(), sl()))
+    ..registerFactoryParam<ChatThreadCubit, UserProfile, void>(
+      (otherUser, _) => ChatThreadCubit(sl(), sl(), otherUser),
+    )
     ..registerFactory(() => MemoryVaultCubit(sl(), sl(), sl(), sl()))
     ..registerFactory(() => TimeTravelCubit(sl()))
     ..registerFactory(() => PremiumCubit(sl()))
     ..registerFactory(() => ReportProblemCubit(sl()))
     ..registerFactory(() => NotificationSettingsCubit(sl(), sl()))
+    ..registerFactory(() => NotificationsCubit(sl()))
     ..registerFactory(
       () => WidgetCustomizationCubit(sl(), sl(), sl(), sl(), sl(), sl()),
     )

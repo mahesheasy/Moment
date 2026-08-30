@@ -38,7 +38,9 @@ object NotificationPreferencesStore {
 
         return when (type) {
             "moment" -> prefs.getBoolean(KEY_MOMENTS, true)
+            "reaction" -> prefs.getBoolean(KEY_MOMENTS, true)
             "friend_request" -> prefs.getBoolean(KEY_FRIEND_REQUESTS, true)
+            "chat" -> prefs.getBoolean(KEY_MOMENTS, true)
             "mention" -> prefs.getBoolean(KEY_MENTIONS, true)
             "memory" -> prefs.getBoolean(KEY_MEMORIES, true)
             "security" -> prefs.getBoolean(KEY_SECURITY, true)

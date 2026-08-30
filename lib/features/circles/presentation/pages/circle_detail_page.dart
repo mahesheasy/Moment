@@ -59,8 +59,13 @@ class _CircleDetailView extends StatelessWidget {
 
   final String circleId;
 
-  Future<void> _showMembers(BuildContext context) async {
+  Future<void> _showMembers(
+    BuildContext context, {
+    required bool isOwner,
+  }) async {
     final cubit = context.read<CircleDetailCubit>();
+    final circle = cubit.state.circle;
+    if (circle == null) return;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -72,9 +77,18 @@ class _CircleDetailView extends StatelessWidget {
         return BlocProvider.value(
           value: cubit,
           child: _MembersSheet(
+            isOwner: isOwner,
             onAdd: () {
               Navigator.of(sheetContext).pop();
               _showAddMemberSheet(context);
+            },
+            onLeave: () {
+              Navigator.of(sheetContext).pop();
+              _confirmLeaveCircle(context);
+            },
+            onDelete: () {
+              Navigator.of(sheetContext).pop();
+              _confirmDeleteCircle(context, circle);
             },
           ),
         );
@@ -162,15 +176,18 @@ class _CircleDetailView extends StatelessWidget {
     );
   }
 
-  void _openCamera(BuildContext context) {
+  Future<void> _openCamera(BuildContext context) async {
     final prompt = context.read<PromptCubit>().state.prompt;
-    if (prompt == null) {
-      context.push(AppRoutes.camera);
-      return;
+    if (prompt != null) {
+      await context.push(
+        AppRoutes.cameraForPrompt(circleId: circleId, promptId: prompt.id),
+      );
+    } else {
+      await context.push(AppRoutes.cameraForCircle(circleId));
     }
-    context.push(
-      AppRoutes.cameraForPrompt(circleId: circleId, promptId: prompt.id),
-    );
+    if (context.mounted) {
+      await context.read<CircleDetailCubit>().load();
+    }
   }
 
   Future<void> _returnToCirclesList(BuildContext context) async {
@@ -289,58 +306,6 @@ class _CircleDetailView extends StatelessWidget {
     }
   }
 
-  Future<void> _showCircleOptions(
-    BuildContext context, {
-    required Circle circle,
-    required bool isOwner,
-  }) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfaceDark,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.lg,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isOwner) ...[
-                  _CircleOptionTile(
-                    icon: Icons.delete_outline_rounded,
-                    label: 'Delete circle',
-                    destructive: true,
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      _confirmDeleteCircle(context, circle);
-                    },
-                  ),
-                ] else ...[
-                  _CircleOptionTile(
-                    icon: Icons.logout_rounded,
-                    label: 'Leave circle',
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      _confirmLeaveCircle(context);
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<CircleDetailCubit, CircleDetailState>(
@@ -407,23 +372,6 @@ class _CircleDetailView extends StatelessWidget {
                       ),
                     ),
                     Spacer(),
-                    IconButton(
-                      onPressed: state.status == CircleDetailStatus.acting
-                          ? null
-                          : () => _showCircleOptions(
-                              context,
-                              circle: circle,
-                              isOwner: isOwner,
-                            ),
-                      icon: Icon(Icons.more_horiz_rounded, size: 22),
-                      color: AppColors.textSecondaryDark,
-                      tooltip: 'Circle options',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
-                      ),
-                    ),
                   ],
                 ),
                 SizedBox(height: 8),
@@ -432,7 +380,7 @@ class _CircleDetailView extends StatelessWidget {
                   members: state.members,
                   avatarCacheKey: state.avatarCacheKey,
                   currentUserId: me,
-                  onMembers: () => _showMembers(context),
+                  onMembers: () => _showMembers(context, isOwner: isOwner),
                   onInvite: isOwner ? () => _showAddMemberSheet(context) : null,
                   onRename: isOwner
                       ? () => _renameCircle(context, circle)
@@ -459,7 +407,7 @@ class _CircleDetailView extends StatelessWidget {
                     if (state.moments.isNotEmpty)
                       GestureDetector(
                         onTap: () =>
-                            context.push(AppRoutes.circleToday(circleId)),
+                            context.push(AppRoutes.circleMoments(circleId)),
                         child: Row(
                           children: [
                             Text(
@@ -505,8 +453,8 @@ class _CircleDetailView extends StatelessWidget {
                 SizedBox(height: 24),
                 GestureDetector(
                   onTap: state.moments.isEmpty
-                      ? null
-                      : () => context.push(AppRoutes.circleToday(circleId)),
+                      ? () => _openCamera(context)
+                      : () => context.push(AppRoutes.circleMoments(circleId)),
                   child: Row(
                     children: [
                       Icon(
@@ -530,9 +478,12 @@ class _CircleDetailView extends StatelessWidget {
                 ),
                 SizedBox(height: 10),
                 if (state.moments.isEmpty)
-                  Text(
-                    'Share a moment to this circle to see it here.',
-                    style: SettingsType.body(AppColors.textTertiaryDark),
+                  GestureDetector(
+                    onTap: () => _openCamera(context),
+                    child: Text(
+                      'Share a moment to this circle to see it here.',
+                      style: SettingsType.body(AppColors.textTertiaryDark),
+                    ),
                   )
                 else
                   _TogetherStrip(
@@ -541,7 +492,7 @@ class _CircleDetailView extends StatelessWidget {
                     onTap: (moment) =>
                         context.push(AppRoutes.moment(moment.id)),
                     onSeeAll: () =>
-                        context.push(AppRoutes.circleToday(circleId)),
+                        context.push(AppRoutes.circleMoments(circleId)),
                   ),
               ],
             ),
@@ -686,35 +637,40 @@ class _CircleHeader extends StatelessWidget {
               ),
             ),
             if (onInvite != null)
-              OutlinedButton(
-                onPressed: onInvite,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.violet,
-                  side: BorderSide(
-                    color: AppColors.violet.withValues(alpha: 0.6),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: AppColors.bloomGradient,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.person_add_outlined, size: 14),
-                    SizedBox(width: 6),
-                    Text(
-                      'Invite',
-                      style: SettingsType.caption(AppColors.violet).copyWith(
-                        fontWeight: FontWeight.w600,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onInvite,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.person_add_outlined,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Invite',
+                            style: SettingsType.caption(Colors.white).copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
           ],
@@ -865,15 +821,6 @@ class _LatestMomentCard extends StatelessWidget {
                 child: _MomentTimeBadge(time: moment.createdAt),
               ),
               Positioned(
-                top: 4,
-                right: 2,
-                child: Icon(
-                  Icons.more_vert_rounded,
-                  size: 18,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-              ),
-              Positioned(
                 left: 12,
                 right: 12,
                 bottom: 12,
@@ -952,35 +899,51 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionCard(
-            icon: AppIcons.heart,
-            label: 'React',
-            subtitle: 'Show how you feel',
-            onTap: onReact,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: _ActionCard(
+                icon: AppIcons.heart,
+                label: 'React',
+                subtitle: 'Show how you feel',
+                onTap: onReact,
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: AppColors.borderDark.withValues(alpha: 0.6),
+            ),
+            Expanded(
+              child: _ActionCard(
+                icon: AppIcons.notifications,
+                label: 'Ping',
+                subtitle: 'Notify circle',
+                onTap: onPing,
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: AppColors.borderDark.withValues(alpha: 0.6),
+            ),
+            Expanded(
+              child: _ActionCard(
+                icon: AppIcons.camera,
+                label: 'Camera',
+                subtitle: 'Capture moment',
+                onTap: onCamera,
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 8),
-        Expanded(
-          child: _ActionCard(
-            icon: AppIcons.notifications,
-            label: 'Ping',
-            subtitle: 'Notify circle',
-            onTap: onPing,
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: _ActionCard(
-            icon: AppIcons.camera,
-            label: 'Camera',
-            subtitle: 'Capture moment',
-            onTap: onCamera,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -1001,23 +964,12 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return Material(
-      color: AppColors.surfaceDark,
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: enabled
-                  ? AppColors.violet.withValues(alpha: 0.25)
-                  : AppColors.borderDark.withValues(alpha: 0.5),
-            ),
-          ),
-          child: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Column(
             children: [
               Icon(
                 icon,
@@ -1044,7 +996,6 @@ class _ActionCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 }
@@ -1062,7 +1013,7 @@ class _TogetherStrip extends StatelessWidget {
   final ValueChanged<Moment> onTap;
   final VoidCallback onSeeAll;
 
-  static const _visibleCount = 4;
+  static const _visibleCount = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -1108,7 +1059,6 @@ class _OverflowTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceElevatedDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderDark.withValues(alpha: 0.5)),
         ),
         child: Text(
           '+$count',
@@ -1313,9 +1263,17 @@ class _RenameCircleDialogState extends State<_RenameCircleDialog> {
 }
 
 class _MembersSheet extends StatelessWidget {
-  const _MembersSheet({required this.onAdd});
+  const _MembersSheet({
+    required this.onAdd,
+    required this.isOwner,
+    required this.onLeave,
+    required this.onDelete,
+  });
 
   final VoidCallback onAdd;
+  final bool isOwner;
+  final VoidCallback onLeave;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1381,6 +1339,22 @@ class _MembersSheet extends StatelessWidget {
                     onTap: () =>
                         context.push(AppRoutes.friend(member.profile.id)),
                   ),
+                if (isOwner) ...[
+                  const SizedBox(height: 16),
+                  _CircleOptionTile(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete circle',
+                    destructive: true,
+                    onTap: onDelete,
+                  ),
+                ] else ...[
+                  const SizedBox(height: 16),
+                  _CircleOptionTile(
+                    icon: Icons.logout_rounded,
+                    label: 'Leave circle',
+                    onTap: onLeave,
+                  ),
+                ],
               ],
             ),
           ),

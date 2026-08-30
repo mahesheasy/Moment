@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moment — End-to-End Feature Implementation</title>
+  <style>
+    :root {
+      --bg: #0b090e;
+      --surface: #16121a;
+      --surface-2: #1e1824;
+      --text: #f8f1f4;
+      --muted: #c4b3bb;
+      --accent: #ff6b8a;
+      --accent-2: #f5c518;
+      --success: #4ade80;
+      --border: #2a2230;
+      --code-bg: #120f14;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      padding: 48px 24px 32px;
+      background: linear-gradient(135deg, #1a1020 0%, #0b090e 60%);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: -0.03em;
+    }
+    header p { margin: 0; color: var(--muted); max-width: 720px; }
+    .meta {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+    nav.toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    nav.toc h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    nav.toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+    nav.toc a { color: var(--accent); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    section.feature {
+      margin-bottom: 48px;
+      scroll-margin-top: 24px;
+    }
+    section.feature h2 {
+      font-size: 1.5rem;
+      margin: 0 0 6px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    section.feature h2 .num {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+    }
+    ul { margin: 0; padding-left: 18px; }
+    li { margin-bottom: 6px; }
+    li strong { color: var(--text); }
+    code, .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ffb4c8;
+    }
+    .flow {
+      background: var(--code-bg);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: #d8cdd2;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status.done { background: rgba(74, 222, 128, 0.15); color: var(--success); }
+    .status.backend { background: rgba(255, 107, 138, 0.15); color: var(--accent); }
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+    @media (max-width: 640px) {
+      nav.toc ol { columns: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Moment — Complete Feature Implementation (E2E)</h1>
+  <p>End-to-end documentation of features implemented in the recent development session: UI, Flutter app layer, Android native, and Supabase backend.</p>
+  <div class="meta">
+    <span class="pill">Flutter / Dart</span>
+    <span class="pill">Android Kotlin + Glance</span>
+    <span class="pill">Supabase Postgres + Edge Functions</span>
+    <span class="pill">August 2026</span>
+  </div>
+</header>
+
+<main>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#chat-blocked">Chat — Blocked State</a></li>
+    <li><a href="#memories">Memories — Camera Roll</a></li>
+    <li><a href="#circles">Circles — UI &amp; Moments</a></li>
+    <li><a href="#premium">Moment+ Premium Page</a></li>
+    <li><a href="#camera">Camera — Sent Flow</a></li>
+    <li><a href="#notifications">Notifications — Swipe Actions</a></li>
+    <li><a href="#chat-inbox">Chat Inbox — Long-Press Menu</a></li>
+    <li><a href="#chat-delete">Chat — Delete Conversation</a></li>
+    <li><a href="#chat-thread">Chat Thread — Loading UX</a></li>
+    <li><a href="#widget">Android Home Widget</a></li>
+    <li><a href="#routes">Routes Reference</a></li>
+    <li><a href="#migrations">Database Migrations</a></li>
+  </ol>
+</nav>
+
+<!-- 1. CHAT BLOCKED -->
+<section class="feature" id="chat-blocked">
+  <h2><span class="num">01</span> Chat — Blocked State in Thread</h2>
+  <p class="subtitle">Users see a blocked UI inside the chat thread instead of being kicked out after blocking.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Open chat thread with a friend → tap header menu → <strong>Block</strong></li>
+      <li>User stays on the thread; composer is replaced with blocked notice + unblock bar</li>
+      <li><strong>Unblock</strong> from header menu or bottom bar restores messaging</li>
+      <li>Sending is guarded while blocked (<code>ChatThreadCubit</code> checks relationship)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Implementation</h3>
+    <table>
+      <tr><th>Layer</th><th>Files / APIs</th></tr>
+      <tr><td>UI</td><td><span class="path">chat_thread_blocked.dart</span>, <span class="path">chat_thread_page.dart</span>, <span class="path">chat_thread_menu.dart</span></td></tr>
+      <tr><td>State</td><td><span class="path">chat_thread_cubit.dart</span> — <code>blockUser()</code>, <code>unblockUser()</code>, <code>isBlocked</code></td></tr>
+      <tr><td>Domain</td><td><span class="path">FriendsRepository.blockUser()</span> / <code>unblockUser()</code></td></tr>
+      <tr><td>Backend</td><td><code>user_blocks</code> table (friends schema migration)</td></tr>
+      <tr><td>DI</td><td><span class="path">injection.dart</span> — <code>FriendsRepository</code> injected into <code>ChatThreadCubit</code></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Data Flow</h3>
+    <div class="flow">User taps Block
+  → MomentDialog.confirm()
+  → FriendsRepository.blockUser(userId)
+  → INSERT user_blocks + remove friendship
+  → ChatThreadCubit.refreshRelationship()
+  → UI: ChatThreadBlockedNotice + ChatThreadBlockedBar
+  → sendMessage() / onComposerChanged() no-op while blocked</div>
+  </div>
+</section>
+
+<!-- 2. MEMORIES -->
+<section class="feature" id="memories">
+  <h2><span class="num">02</span> Memories — Camera Roll Fix</h2>
+  <p class="subtitle">Camera Roll shows both sent and received moments; Create Video banner removed.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Open Memories → Camera Roll tab shows all personal moments (sent + received, deduplicated)</li>
+      <li>No misleading "Create Video" banner at top</li>
+      <li>Updated empty-state copy when no moments exist</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Implementation</h3>
+    <table>
+      <tr><th>Layer</th><th>Details</th></tr>
+      <tr><td>UI</td><td><span class="path">snap_memories_view.dart</span> — removed <code>_buildCreateVideoBanner()</code></td></tr>
+      <tr><td>State</td><td><span class="path">memory_cubit.dart</span> — <code>_loadCameraRollMoments()</code> merges sent + received</td></tr>
+      <tr><td>Data</td><td><span class="path">listSentMoments()</span> in remote + repository</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 3. CIRCLES -->
+<section class="feature" id="circles">
+  <h2><span class="num">03</span> Circles — Detail, List &amp; Moments Page</h2>
+  <p class="subtitle">Theme fixes, correct moment counts, cleaner cards, dedicated circle moments route.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li><strong>Circles list</strong> — cards without heavy borders; <code>⋯</code> more menu instead of chevron; hide bottom CTA when circles exist</li>
+      <li><strong>Circle detail</strong> — "Moments together" / "See all" opens real moments (not Today page with 0 count)</li>
+      <li><strong>Action row</strong> — React / Ping / Camera with vertical dividers; Invite uses bloom gradient</li>
+      <li><strong>Members sheet</strong> — delete/leave actions moved here; removed duplicate top <code>⋯</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Implementation</h3>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><span class="path">circle_moments_page.dart</span> <span class="status done">NEW</span></td><td>Route <code>/circles/:id/moments</code> — actual circle moments feed</td></tr>
+      <tr><td><span class="path">circle_detail_page.dart</span></td><td>Theme, borders removed, invite button, action row dividers</td></tr>
+      <tr><td><span class="path">circles_page.dart</span></td><td>Card styling, more menu, conditional create CTA</td></tr>
+      <tr><td><span class="path">circle_today_page.dart</span></td><td>Moment dark theme + gradient buttons</td></tr>
+      <tr><td><span class="path">circle_member_avatar_stack.dart</span></td><td>Avatar borders removed</td></tr>
+      <tr><td><span class="path">app_router.dart</span></td><td>Registered <code>CircleMomentsPage</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 4. PREMIUM -->
+<section class="feature" id="premium">
+  <h2><span class="num">04</span> Moment+ Premium Page</h2>
+  <p class="subtitle">Cleaner, more professional subscription UI without excessive borders.</p>
+
+  <div class="card">
+    <h3>Changes</h3>
+    <ul>
+      <li>Removed borders on feature list, plan cards, footer</li>
+      <li>Single-column feature list at 14px</li>
+      <li>Plan cards: tint-only selected state (no border outline)</li>
+      <li>Improved typography, spacing, alignment</li>
+    </ul>
+    <p><span class="path">lib/features/subscription/presentation/pages/premium_page.dart</span></p>
+  </div>
+</section>
+
+<!-- 5. CAMERA -->
+<section class="feature" id="camera">
+  <h2><span class="num">05</span> Camera — Sent Flow &amp; Navigation</h2>
+  <p class="subtitle">"Back to Home" works correctly; hero animation on success.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Capture moment → Send → Success screen with animated checkmark (Hero)</li>
+      <li><strong>Back to Home</strong> pops nested camera navigator + <code>/camera</code> route, then <code>go(/home)</code></li>
+      <li>Send button shares Hero tag with success checkmark for smooth transition</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Implementation</h3>
+    <table>
+      <tr><th>File</th><th>Role</th></tr>
+      <tr><td><span class="path">camera_flow_navigation.dart</span> <span class="status done">NEW</span></td><td><code>exitCameraFlowToHome()</code>, <code>exitCameraFlowToMoment()</code></td></tr>
+      <tr><td><span class="path">camera_sent_page.dart</span></td><td>Uses navigation helpers; Hero on success</td></tr>
+      <tr><td><span class="path">camera_send_to_page.dart</span></td><td>Hero on Send; fade PageRouteBuilder to sent page</td></tr>
+      <tr><td><span class="path">moment_hero_tags.dart</span></td><td><code>cameraSendSuccess</code> tag</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 6. NOTIFICATIONS -->
+<section class="feature" id="notifications">
+  <h2><span class="num">06</span> Notifications — Instagram-Style Swipe Actions</h2>
+  <p class="subtitle">Swipe left on notification rows for More + Delete; bottom sheet for actions.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Notifications screen → swipe left on any row</li>
+      <li><strong>More (⋯)</strong> — bottom sheet: Mark as read, Not interested, Turn off notifications like this</li>
+      <li><strong>Delete (trash)</strong> — dismisses notification immediately</li>
+      <li>Dismissed IDs persisted locally; filtered from feed on reload</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Implementation</h3>
+    <table>
+      <tr><th>Layer</th><th>Details</th></tr>
+      <tr><td>UI</td><td><span class="path">notification_swipe_tile.dart</span>, <span class="path">notifications_page.dart</span></td></tr>
+      <tr><td>State</td><td><span class="path">notifications_cubit.dart</span> — <code>dismiss(id)</code></td></tr>
+      <tr><td>Local cache</td><td><span class="path">notifications_read_local_cache.dart</span> — <code>dismissed_notification_ids</code></td></tr>
+      <tr><td>Repository</td><td><span class="path">notifications_repository_impl.dart</span> — filter dismissed in feed</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Swipe UI Spec</h3>
+    <ul>
+      <li>Swipe left reveals grey <strong>More</strong> (56px) + red <strong>Delete</strong> (56px)</li>
+      <li>Tap row when open → closes swipe</li>
+      <li>Group cards: no per-row dividers (flush action buttons)</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 7. CHAT INBOX -->
+<section class="feature" id="chat-inbox">
+  <h2><span class="num">07</span> Chat Inbox — Long-Press Actions (E2E)</h2>
+  <p class="subtitle">Pin, mute, delete, block — full stack from UI to Supabase.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Chat tab → long-press any conversation</li>
+      <li>Bottom sheet: View profile, Pin/Unpin, Mute/Unmute, Delete chat, Block/Unblock</li>
+      <li>Pinned chats sort to top; muted shows bell-off icon; pinned shows pin icon</li>
+      <li>Optimistic UI updates via <code>ChatInboxCubit</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Backend — <code>chat_conversation_settings</code></h3>
+    <table>
+      <tr><th>Column</th><th>Purpose</th></tr>
+      <tr><td><code>is_pinned</code> / <code>pinned_at</code></td><td>Pin chat to top of inbox</td></tr>
+      <tr><td><code>is_muted</code></td><td>Suppress push for this conversation</td></tr>
+      <tr><td><code>is_hidden</code></td><td>Hide from inbox (delete chat)</td></tr>
+    </table>
+    <p>Migration: <span class="path">20260829160000_chat_conversation_settings.sql</span></p>
+    <p>RLS: users manage own settings; must be conversation participant.</p>
+    <p>Realtime: table added to <code>supabase_realtime</code> publication for inbox refresh.</p>
+  </div>
+
+  <div class="card">
+    <h3>App Layer</h3>
+    <table>
+      <tr><th>File</th><th>Role</th></tr>
+      <tr><td><span class="path">chat_inbox_menu.dart</span></td><td>Bottom sheet UI + <code>ChatInboxMenuAction</code> enum</td></tr>
+      <tr><td><span class="path">chat_inbox_page.dart</span></td><td>Long-press handler, confirmations, snackbars</td></tr>
+      <tr><td><span class="path">chat_inbox_cubit.dart</span></td><td><code>pinConversation</code>, <code>muteConversation</code>, <code>deleteConversation</code>, <code>blockUser</code></td></tr>
+      <tr><td><span class="path">chat_inbox_tile.dart</span></td><td>Pin + mute icons in row</td></tr>
+      <tr><td><span class="path">chat_remote_data_source.dart</span></td><td>CRUD on settings; inbox sort pinned first</td></tr>
+      <tr><td><span class="path">chat_entities.dart</span></td><td><code>ChatConversation.isPinned</code>, <code>isMuted</code></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Push — Mute Enforcement</h3>
+    <p><span class="path">supabase/functions/notify-chat/index.ts</span> checks <code>chat_conversation_settings.is_muted</code> before sending FCM. Returns <code>{ skipped: "muted" }</code> when muted.</p>
+  </div>
+
+  <div class="card">
+    <h3>Data Flow — Pin Example</h3>
+    <div class="flow">Long-press → Pin chat
+  → ChatInboxCubit.pinConversation(id) [optimistic UI]
+  → ChatRepository.setConversationPinned(pinned: true)
+  → UPSERT chat_conversation_settings (is_pinned, pinned_at)
+  → Realtime triggers inbox refresh
+  → Conversation sorted to top</div>
+  </div>
+</section>
+
+<!-- 8. CHAT DELETE -->
+<section class="feature" id="chat-delete">
+  <h2><span class="num">08</span> Chat — Delete Conversation (Full Clear)</h2>
+  <p class="subtitle">Delete chat removes all messages from the database, not just hiding the inbox row.</p>
+
+  <div class="card">
+    <h3>User Flow</h3>
+    <ul>
+      <li>Long-press chat → Delete chat → confirm</li>
+      <li>Conversation removed from inbox; all messages deleted server-side</li>
+      <li>Re-open friend → empty thread; new messages start fresh</li>
+      <li><strong>Note:</strong> Deletes entire message history for both participants</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Backend RPC — <code>delete_chat_conversation(p_conversation_id)</code></h3>
+    <p>Migration: <span class="path">20260829170000_delete_chat_conversation.sql</span></p>
+    <ol>
+      <li>Validate caller is conversation participant</li>
+      <li>DELETE <code>chat_typing</code> rows</li>
+      <li>DELETE all <code>chat_messages</code> (reactions, stars, hidden cascade)</li>
+      <li>RESET <code>last_message_preview</code> + <code>last_message_at</code> on conversation</li>
+      <li>UPSERT settings: <code>is_hidden = true</code>, unpin</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>Fresh Chat Restart</h3>
+    <div class="flow">getOrCreateConversation(otherUserId)
+  → RPC get_or_create_chat_conversation
+  → _unhideConversation() sets is_hidden = false
+  → Thread loads with zero messages
+  → New message INSERT triggers chat_touch_conversation trigger</div>
+  </div>
+</section>
+
+<!-- 9. CHAT THREAD LOADING -->
+<section class="feature" id="chat-thread">
+  <h2><span class="num">09</span> Chat Thread — Loading UX (No Flicker)</h2>
+  <p class="subtitle">Shimmer while loading; stable transition to messages or empty state.</p>
+
+  <div class="card">
+    <h3>Problem Fixed</h3>
+    <ul>
+      <li>Old behavior: messages → loading → empty → messages (flicker)</li>
+      <li>Cause: realtime stream emitted <code>[]</code> before initial fetch completed</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Solution</h3>
+    <table>
+      <tr><th>Change</th><th>Location</th></tr>
+      <tr><td><code>hasCompletedInitialLoad</code> flag on state</td><td><span class="path">chat_thread_cubit.dart</span></td></tr>
+      <tr><td><code>_acceptStreamUpdates</code> — ignore stream until initial load done</td><td><span class="path">chat_thread_cubit.dart</span></td></tr>
+      <tr><td>Don't emit empty from <code>watchMessages</code> when <code>lastRows.isEmpty</code></td><td><span class="path">chat_remote_data_source.dart</span></td></tr>
+      <tr><td>UI: shimmer until <code>hasCompletedInitialLoad</code></td><td><span class="path">chat_thread_page.dart</span></td></tr>
+      <tr><td>Error state with retry when load fails</td><td><span class="path">chat_thread_page.dart</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>UI States</h3>
+    <div class="flow">Open thread
+  → ChatThreadShimmer (hasCompletedInitialLoad = false)
+  → getOrCreateConversation + getMessages
+  → ready + messages OR empty timeline OR blocked notice OR error state
+  → stream updates only after initial load</div>
+  </div>
+</section>
+
+<!-- 10. ANDROID WIDGET -->
+<section class="feature" id="widget">
+  <h2><span class="num">10</span> Android Home Screen Widget</h2>
+  <p class="subtitle">Glance widget redesign — clean photo card with streak, no clutter.</p>
+
+  <div class="card">
+    <h3>User-Visible Changes</h3>
+    <ul>
+      <li>❌ Removed top <strong>"🎞 Moment"</strong> badge</li>
+      <li>❌ Removed bottom <strong>♡</strong> heart icon</li>
+      <li>❌ Removed page indicators <strong>● ○ ○</strong> (all layouts)</li>
+      <li>✅ Streak <strong>🔥 {count}</strong> shown bottom-right in pill badge</li>
+      <li>✅ Cleaner bottom scrim: sender name + time left, streak right</li>
+      <li>✅ Default display size → <code>small</code> (compact Locket layout for 2×2 widget)</li>
+      <li>✅ Widget refreshes on app resume (<code>MainActivity.onResume</code>)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Architecture</h3>
+    <table>
+      <tr><th>Component</th><th>File</th></tr>
+      <tr><td>Glance composable</td><td><span class="path">MomentGlanceWidget.kt</span></td></tr>
+      <tr><td>Layouts</td><td><code>LocketPhotoLayout</code>, <code>FullMomentLayout</code>, <code>LocketEmptyLayout</code>, etc.</td></tr>
+      <tr><td>Streak badge</td><td><code>WidgetStreakBadge()</code> composable</td></tr>
+      <tr><td>Data store</td><td><span class="path">MomentWidgetDataStore.kt</span> — prefs + queue</td></tr>
+      <tr><td>FCM → widget</td><td><span class="path">MomentFirebaseMessagingService.kt</span></td></tr>
+      <tr><td>Flutter bridge</td><td><span class="path">WidgetBridgePlugin.kt</span> — sync prefs + moments</td></tr>
+      <tr><td>Receiver</td><td><span class="path">MomentWidgetReceiver.kt</span></td></tr>
+      <tr><td>Manifest</td><td><span class="path">AndroidManifest.xml</span> — receiver + FCM service</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Widget Data Pipeline</h3>
+    <div class="flow">New moment push (FCM)
+  → MomentFirebaseMessagingService.handleMomentMessage()
+  → Download image → WidgetMomentQueue.prependMoment()
+  → MomentWidgetDataStore.save()
+  → MomentWidgetUpdater.updateAll()
+  → MomentGlanceWidget.provideGlance()
+  → LocketPhotoLayout renders photo + metadata + streak
+
+Flutter app sync:
+  → WidgetBridgePlugin.updateWidget() / syncPreferences()
+  → Same data store + updater</div>
+  </div>
+
+  <div class="card">
+    <h3>Deploy Note</h3>
+    <p>After native widget changes: <strong>full rebuild</strong> (<code>flutter clean && flutter run</code>), then <strong>remove and re-add</strong> the widget on the home screen. Hot reload does not update Glance widgets.</p>
+  </div>
+</section>
+
+<!-- ROUTES -->
+<section class="feature" id="routes">
+  <h2><span class="num">11</span> Key Routes Reference</h2>
+  <div class="card">
+    <table>
+      <tr><th>Route</th><th>Screen</th></tr>
+      <tr><td><code>/chat</code></td><td>Chat inbox (shell tab)</td></tr>
+      <tr><td><code>/chat/:userId</code></td><td>Chat thread</td></tr>
+      <tr><td><code>/notifications</code></td><td>Notifications (swipe actions)</td></tr>
+      <tr><td><code>/settings/blocked</code></td><td>Blocked users</td></tr>
+      <tr><td><code>/circles/:id/moments</code></td><td>Circle moments feed</td></tr>
+      <tr><td><code>/camera</code></td><td>Camera flow (nested)</td></tr>
+      <tr><td><code>/premium</code></td><td>Moment+ subscription</td></tr>
+      <tr><td><code>/settings/widget</code></td><td>Widget settings</td></tr>
+      <tr><td><code>moment://moment/:id</code></td><td>Deep link from widget tap</td></tr>
+    </table>
+    <p><span class="path">lib/app/router/app_routes.dart</span> + <span class="path">app_router.dart</span></p>
+  </div>
+</section>
+
+<!-- MIGRATIONS -->
+<section class="feature" id="migrations">
+  <h2><span class="num">12</span> Session Database Migrations</h2>
+  <div class="card">
+    <table>
+      <tr><th>Migration</th><th>Purpose</th><th>Status</th></tr>
+      <tr>
+        <td><code>20260829120000_chat_message_actions.sql</code></td>
+        <td>Reply, reactions, delete-for-me/everyone, <code>chat_message_hidden</code></td>
+        <td><span class="status backend">Applied</span></td>
+      </tr>
+      <tr>
+        <td><code>20260829160000_chat_conversation_settings.sql</code></td>
+        <td>Pin, mute, hide per-user conversation prefs + realtime</td>
+        <td><span class="status backend">Applied</span></td>
+      </tr>
+      <tr>
+        <td><code>20260829170000_delete_chat_conversation.sql</code></td>
+        <td>RPC <code>delete_chat_conversation</code> — full message wipe</td>
+        <td><span class="status backend">Applied</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Edge Functions Updated</h3>
+    <ul>
+      <li><span class="path">supabase/functions/notify-chat/index.ts</span> — mute check before FCM send</li>
+    </ul>
+  </div>
+</section>
+
+<!-- TEST PLAN -->
+<section class="feature" id="test-plan">
+  <h2><span class="num">13</span> Manual Test Checklist</h2>
+  <div class="card">
+    <table>
+      <tr><th>Feature</th><th>Test Steps</th></tr>
+      <tr><td>Chat block</td><td>Block from thread menu → verify blocked UI → unblock → send message</td></tr>
+      <tr><td>Chat inbox pin/mute</td><td>Long-press → pin → appears at top with pin icon → mute → no push on new message</td></tr>
+      <tr><td>Chat delete</td><td>Delete chat → reopen friend → empty thread → send new message → appears in inbox</td></tr>
+      <tr><td>Chat loading</td><td>Open thread → shimmer only → messages appear without flicker</td></tr>
+      <tr><td>Notifications swipe</td><td>Swipe left → More sheet actions → Delete removes row persistently</td></tr>
+      <tr><td>Circle moments</td><td>Detail → "See all" → shows actual circle moments count</td></tr>
+      <tr><td>Camera sent</td><td>Send moment → success hero → Back to Home lands on home tab</td></tr>
+      <tr><td>Widget</td><td>Full rebuild → re-add widget → no Moment label, no dots, streak bottom-right</td></tr>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Moment App — Feature Implementation Documentation · Generated for development session review
+</footer>
+
+</body>
+</html>

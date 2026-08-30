@@ -7,7 +7,7 @@ import 'package:moment/core/theme/app_shadows.dart';
 import 'package:moment/core/theme/app_typography.dart';
 import 'package:moment/core/theme/moment_theme.dart';
 
-enum MomentNavItem { home, circles, memories, profile }
+enum MomentNavItem { home, circles, chat, profile }
 
 class MomentNavigationBar extends StatelessWidget {
   const MomentNavigationBar({
@@ -55,11 +55,11 @@ class MomentNavigationBar extends StatelessWidget {
               ),
               _CameraButton(onTap: onCameraTap),
               _NavItem(
-                icon: AppIcons.memories,
-                selectedIcon: AppIcons.memoriesFilled,
-                label: 'Memories',
-                selected: current == MomentNavItem.memories,
-                onTap: () => onTap(MomentNavItem.memories),
+                icon: AppIcons.chat,
+                selectedIcon: AppIcons.chatFilled,
+                label: 'Chat',
+                selected: current == MomentNavItem.chat,
+                onTap: () => onTap(MomentNavItem.chat),
               ),
               _NavItem(
                 icon: AppIcons.profile,
@@ -175,7 +175,7 @@ extension MomentNavRouting on MomentNavItem {
   String get route => switch (this) {
     MomentNavItem.home => AppRoutes.home,
     MomentNavItem.circles => AppRoutes.circles,
-    MomentNavItem.memories => AppRoutes.memories,
+    MomentNavItem.chat => AppRoutes.chat,
     MomentNavItem.profile => AppRoutes.profile,
   };
 
@@ -183,8 +183,8 @@ extension MomentNavRouting on MomentNavItem {
     if (location.startsWith(AppRoutes.circles)) {
       return MomentNavItem.circles;
     }
-    if (location.startsWith(AppRoutes.memories)) {
-      return MomentNavItem.memories;
+    if (location.startsWith(AppRoutes.chat)) {
+      return MomentNavItem.chat;
     }
     if (location.startsWith(AppRoutes.profile)) {
       return MomentNavItem.profile;
