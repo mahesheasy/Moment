@@ -97,7 +97,7 @@ class ChatThreadBlockedBar extends StatelessWidget {
         12 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: BoxDecoration(
-        color: MomentSpaceTheme.composerBarBackground,
+        color: MomentSpaceTheme.composerBarBackground(context),
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),

@@ -9,6 +9,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String camera = '/camera';
   static const String friends = '/friends';
+  static const String friendsScan = '/friends/scan';
   static const String circles = '/circles';
   static const String chat = '/chat';
   static const String settings = '/settings';
@@ -24,6 +25,8 @@ class AppRoutes {
   static const String appearance = '/settings/appearance';
   static const String help = '/settings/help';
   static const String reportProblem = '/settings/report-problem';
+  static const String termsOfService = '/auth/terms';
+  static const String privacyPolicy = '/auth/privacy';
   static const String timeTravel = '/time-travel';
 
   static String moment(String id, {String? heroScope}) {

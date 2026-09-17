@@ -9,7 +9,7 @@ enum AppNotificationType {
   friendJoined,
 }
 
-enum AppNotificationFilter { all, mentions, updates, system }
+enum AppNotificationFilter { all, moments, chats, social }
 
 sealed class AppNotificationTarget extends Equatable {
   const AppNotificationTarget();
@@ -66,16 +66,21 @@ class AppNotification extends Equatable {
   final String? avatarName;
   final String? avatarUrl;
 
+  bool get isChat => type == AppNotificationType.chat;
+
+  bool get isMomentRelated =>
+      type == AppNotificationType.moment ||
+      type == AppNotificationType.reaction ||
+      type == AppNotificationType.ping;
+
   bool matchesFilter(AppNotificationFilter filter) {
     return switch (filter) {
       AppNotificationFilter.all => true,
-      AppNotificationFilter.mentions => type == AppNotificationType.ping,
-      AppNotificationFilter.updates =>
-        type == AppNotificationType.reaction ||
-            type == AppNotificationType.moment ||
-            type == AppNotificationType.chat ||
+      AppNotificationFilter.moments => isMomentRelated,
+      AppNotificationFilter.chats => isChat,
+      AppNotificationFilter.social =>
+        type == AppNotificationType.friendRequest ||
             type == AppNotificationType.friendJoined,
-      AppNotificationFilter.system => type == AppNotificationType.friendRequest,
     };
   }
 

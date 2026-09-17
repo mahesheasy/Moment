@@ -11,7 +11,7 @@ Future<void> showChatMessageInfoSheet({
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: MomentSpaceTheme.surfaceElevated,
+    backgroundColor: MomentSpaceTheme.surfaceElevated(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

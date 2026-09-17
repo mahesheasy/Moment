@@ -103,7 +103,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<NotificationsCubit, NotificationsState>(
+    return BlocConsumer<NotificationsCubit, NotificationsState>(
+      listenWhen: (prev, next) =>
+          prev.errorMessage != next.errorMessage ||
+          prev.actionMessage != next.actionMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+        }
+        if (state.actionMessage != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.actionMessage!)));
+        }
+      },
       builder: (context, state) {
         final filtered = state.filteredItems;
         final unread = filtered.where((n) => n.isUnread).toList();
@@ -122,8 +137,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       context.read<NotificationsCubit>().markAllRead(),
                   child: Text(
                     'Mark all read',
-                    style: SettingsType.caption(AppColors.violet)
-                        .copyWith(fontWeight: FontWeight.w600),
+                    style: SettingsType.caption(
+                      AppColors.violet,
+                    ).copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
               IconButton(
@@ -133,72 +149,84 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ],
           ),
           body: switch (state.status) {
-            NotificationsStatus.initial ||
-            NotificationsStatus.loading when state.items.isEmpty =>
+            NotificationsStatus.initial || NotificationsStatus.loading
+                when state.items.isEmpty =>
               const Center(child: CircularProgressIndicator()),
-            NotificationsStatus.error when state.items.isEmpty =>
-              _ErrorState(message: state.errorMessage),
+            NotificationsStatus.error when state.items.isEmpty => _ErrorState(
+              message: state.errorMessage,
+            ),
             _ => RefreshIndicator(
-                onRefresh: () =>
-                    context.read<NotificationsCubit>().refresh(),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    0,
-                    AppSpacing.lg,
-                    AppSpacing.huge,
-                  ),
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: SettingsType.title(AppColors.textPrimaryDark)
-                          .copyWith(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Stay updated with what matters.',
-                      style: SettingsType.body(AppColors.textTertiaryDark),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    _FilterRow(
-                      filter: state.filter,
-                      onChanged: context.read<NotificationsCubit>().setFilter,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    if (filtered.isEmpty)
-                      const _CaughtUpCard()
-                    else ...[
-                      if (unread.isNotEmpty) ...[
-                        const _SectionLabel(label: 'New'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _NotificationGroup(
-                          items: unread,
-                          onTap: _onNotificationTap,
-                          onMore: _showNotificationOptions,
-                          onDelete: _dismissNotification,
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                      ],
-                      if (earlier.isNotEmpty) ...[
-                        const _SectionLabel(label: 'Earlier'),
-                        const SizedBox(height: AppSpacing.sm),
-                        _NotificationGroup(
-                          items: earlier,
-                          onTap: _onNotificationTap,
-                          onMore: _showNotificationOptions,
-                          onDelete: _dismissNotification,
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.xl),
-                      const _CaughtUpCard(),
-                    ],
-                  ],
+              onRefresh: () => context.read<NotificationsCubit>().refresh(),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.huge,
                 ),
+                children: [
+                  Text(
+                    'Notifications',
+                    style: SettingsType.title(
+                      AppColors.textPrimaryDark,
+                    ).copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Stay updated with what matters.',
+                    style: SettingsType.body(AppColors.textTertiaryDark),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _FilterRow(
+                    filter: state.filter,
+                    onChanged: context.read<NotificationsCubit>().setFilter,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  if (filtered.isEmpty)
+                    const _CaughtUpCard()
+                  else ...[
+                    if (unread.isNotEmpty) ...[
+                      const _SectionLabel(label: 'New'),
+                      const SizedBox(height: AppSpacing.sm),
+                      _NotificationGroup(
+                        items: unread,
+                        actingOn: state.actingOn,
+                        onTap: _onNotificationTap,
+                        onMore: _showNotificationOptions,
+                        onDelete: _dismissNotification,
+                        onAcceptFriendRequest: (item) => context
+                            .read<NotificationsCubit>()
+                            .acceptFriendRequest(item),
+                        onRejectFriendRequest: (item) => context
+                            .read<NotificationsCubit>()
+                            .rejectFriendRequest(item),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
+                    if (earlier.isNotEmpty) ...[
+                      const _SectionLabel(label: 'Earlier'),
+                      const SizedBox(height: AppSpacing.sm),
+                      _NotificationGroup(
+                        items: earlier,
+                        actingOn: state.actingOn,
+                        onTap: _onNotificationTap,
+                        onMore: _showNotificationOptions,
+                        onDelete: _dismissNotification,
+                        onAcceptFriendRequest: (item) => context
+                            .read<NotificationsCubit>()
+                            .acceptFriendRequest(item),
+                        onRejectFriendRequest: (item) => context
+                            .read<NotificationsCubit>()
+                            .rejectFriendRequest(item),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.xl),
+                    const _CaughtUpCard(),
+                  ],
+                ],
               ),
+            ),
           },
         );
       },
@@ -256,24 +284,26 @@ class _FilterRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _FilterChip(
-            label: 'Mentions',
-            icon: Icons.alternate_email_rounded,
-            selected: filter == AppNotificationFilter.mentions,
-            onTap: () => onChanged(AppNotificationFilter.mentions),
+            label: 'Moments',
+            icon: Icons.photo_camera_rounded,
+            selected: filter == AppNotificationFilter.moments,
+            accent: AppColors.sendCoral,
+            onTap: () => onChanged(AppNotificationFilter.moments),
           ),
           const SizedBox(width: 8),
           _FilterChip(
-            label: 'Updates',
-            icon: Icons.campaign_outlined,
-            selected: filter == AppNotificationFilter.updates,
-            onTap: () => onChanged(AppNotificationFilter.updates),
+            label: 'Chats',
+            icon: Icons.chat_bubble_rounded,
+            selected: filter == AppNotificationFilter.chats,
+            accent: const Color(0xFF6B8AFF),
+            onTap: () => onChanged(AppNotificationFilter.chats),
           ),
           const SizedBox(width: 8),
           _FilterChip(
-            label: 'System',
-            icon: Icons.settings_outlined,
-            selected: filter == AppNotificationFilter.system,
-            onTap: () => onChanged(AppNotificationFilter.system),
+            label: 'Social',
+            icon: Icons.people_alt_rounded,
+            selected: filter == AppNotificationFilter.social,
+            onTap: () => onChanged(AppNotificationFilter.social),
           ),
         ],
       ),
@@ -287,15 +317,18 @@ class _FilterChip extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.accent,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
+    final chipAccent = accent ?? AppColors.violet;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -303,10 +336,12 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          gradient: selected ? AppColors.bloomGradient : null,
-          color: selected ? null : AppColors.surfaceDark,
+          color: selected
+              ? chipAccent.withValues(alpha: 0.22)
+              : AppColors.surfaceDark,
           border: Border.all(
-            color: selected ? Colors.transparent : AppColors.borderDark,
+            color: selected ? chipAccent : AppColors.borderDark,
+            width: selected ? 1.5 : 1,
           ),
         ),
         child: Row(
@@ -315,13 +350,13 @@ class _FilterChip extends StatelessWidget {
             Icon(
               icon,
               size: 14,
-              color: selected ? Colors.white : AppColors.textTertiaryDark,
+              color: selected ? chipAccent : AppColors.textTertiaryDark,
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: SettingsType.caption(
-                selected ? Colors.white : AppColors.textTertiaryDark,
+                selected ? chipAccent : AppColors.textTertiaryDark,
               ).copyWith(fontWeight: FontWeight.w600),
             ),
           ],
@@ -340,8 +375,9 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: SettingsType.title(AppColors.textPrimaryDark)
-          .copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+      style: SettingsType.title(
+        AppColors.textPrimaryDark,
+      ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
     );
   }
 }
@@ -352,12 +388,18 @@ class _NotificationGroup extends StatelessWidget {
     required this.onTap,
     required this.onMore,
     required this.onDelete,
+    this.actingOn,
+    this.onAcceptFriendRequest,
+    this.onRejectFriendRequest,
   });
 
   final List<AppNotification> items;
   final ValueChanged<AppNotification> onTap;
   final ValueChanged<AppNotification> onMore;
   final ValueChanged<AppNotification> onDelete;
+  final String? actingOn;
+  final ValueChanged<AppNotification>? onAcceptFriendRequest;
+  final ValueChanged<AppNotification>? onRejectFriendRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -372,7 +414,12 @@ class _NotificationGroup extends StatelessWidget {
                 onTap: () => onTap(items[i]),
                 onMore: () => onMore(items[i]),
                 onDelete: () => onDelete(items[i]),
-                child: _NotificationTileContent(item: items[i]),
+                child: _NotificationTileContent(
+                  item: items[i],
+                  actingOn: actingOn,
+                  onAcceptFriendRequest: onAcceptFriendRequest,
+                  onRejectFriendRequest: onRejectFriendRequest,
+                ),
               ),
           ],
         ),
@@ -382,66 +429,248 @@ class _NotificationGroup extends StatelessWidget {
 }
 
 class _NotificationTileContent extends StatelessWidget {
-  const _NotificationTileContent({required this.item});
+  const _NotificationTileContent({
+    required this.item,
+    this.actingOn,
+    this.onAcceptFriendRequest,
+    this.onRejectFriendRequest,
+  });
 
   final AppNotification item;
+  final String? actingOn;
+  final ValueChanged<AppNotification>? onAcceptFriendRequest;
+  final ValueChanged<AppNotification>? onRejectFriendRequest;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _NotificationLeading(item: item),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: SettingsType.body(AppColors.textSecondaryDark),
+    final accent = _accentForType(item.type);
+    final typeLabel = _typeLabel(item.type);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: accent, width: 3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _NotificationLeading(item: item, accent: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      TextSpan(
-                        text: item.title,
-                        style: TextStyle(
-                          color: AppColors.violet,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          typeLabel,
+                          style: SettingsType.caption(accent).copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
-                      TextSpan(text: ' ${item.body}'),
+                      const Spacer(),
+                      if (item.isUnread)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  relativeTimeAgo(item.createdAt),
-                  style: SettingsType.caption(AppColors.textTertiaryDark),
-                ),
-              ],
-            ),
-          ),
-          if (item.isUnread)
-            Container(
-              width: 8,
-              height: 8,
-              margin: const EdgeInsets.only(top: 6),
-              decoration: BoxDecoration(
-                color: AppColors.violet,
-                shape: BoxShape.circle,
+                  const SizedBox(height: 6),
+                  RichText(
+                    text: TextSpan(
+                      style: SettingsType.body(AppColors.textSecondaryDark),
+                      children: [
+                        TextSpan(
+                          text: item.title,
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(text: ' ${item.body}'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    relativeTimeAgo(item.createdAt),
+                    style: SettingsType.caption(AppColors.textTertiaryDark),
+                  ),
+                ],
               ),
             ),
-        ],
+            if (_showFriendRequestActions) ...[
+              const SizedBox(width: 10),
+              _FriendRequestNotificationActions(
+                item: item,
+                actingOn: actingOn,
+                onAccept: onAcceptFriendRequest,
+                onReject: onRejectFriendRequest,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool get _showFriendRequestActions {
+    if (item.type != AppNotificationType.friendRequest) return false;
+    final target = item.target;
+    return target is FriendNotificationTarget && target.requestId != null;
+  }
+
+  Color _accentForType(AppNotificationType type) {
+    return switch (type) {
+      AppNotificationType.chat => const Color(0xFF6B8AFF),
+      AppNotificationType.moment ||
+      AppNotificationType.reaction ||
+      AppNotificationType.ping => AppColors.sendCoral,
+      AppNotificationType.friendRequest ||
+      AppNotificationType.friendJoined => AppColors.violet,
+    };
+  }
+
+  String _typeLabel(AppNotificationType type) {
+    return switch (type) {
+      AppNotificationType.chat => 'CHAT',
+      AppNotificationType.moment => 'MOMENT',
+      AppNotificationType.reaction => 'REACTION',
+      AppNotificationType.ping => 'PING',
+      AppNotificationType.friendRequest => 'REQUEST',
+      AppNotificationType.friendJoined => 'ACCEPTED',
+    };
+  }
+}
+
+class _FriendRequestNotificationActions extends StatelessWidget {
+  const _FriendRequestNotificationActions({
+    required this.item,
+    required this.actingOn,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  static const _rejectRed = Color(0xFFED4956);
+
+  final AppNotification item;
+  final String? actingOn;
+  final ValueChanged<AppNotification>? onAccept;
+  final ValueChanged<AppNotification>? onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = item.target as FriendNotificationTarget;
+    final requestId = target.requestId!;
+    final isAccepting = actingOn == 'accept:$requestId';
+    final isRejecting = actingOn == 'reject:$requestId';
+    final isBusy = isAccepting || isRejecting;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _FriendRequestActionIcon(
+          icon: Icons.close_rounded,
+          iconColor: _rejectRed,
+          borderColor: _rejectRed.withValues(alpha: 0.45),
+          backgroundColor: _rejectRed.withValues(alpha: 0.12),
+          isLoading: isRejecting,
+          onTap: isBusy ? null : () => onReject?.call(item),
+        ),
+        const SizedBox(width: 8),
+        _FriendRequestActionIcon(
+          icon: Icons.check_rounded,
+          filled: true,
+          isLoading: isAccepting,
+          onTap: isBusy ? null : () => onAccept?.call(item),
+        ),
+      ],
+    );
+  }
+}
+
+class _FriendRequestActionIcon extends StatelessWidget {
+  const _FriendRequestActionIcon({
+    required this.icon,
+    required this.onTap,
+    this.filled = false,
+    this.isLoading = false,
+    this.iconColor,
+    this.backgroundColor,
+    this.borderColor,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool filled;
+  final bool isLoading;
+  final Color? iconColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedIconColor = filled
+        ? Colors.white
+        : iconColor ?? AppColors.textSecondaryDark;
+    final resolvedBackground = filled
+        ? AppColors.violet
+        : backgroundColor ?? AppColors.surfaceElevatedDark;
+
+    return Material(
+      color: resolvedBackground,
+      shape: CircleBorder(
+        side: filled || borderColor == null
+            ? BorderSide.none
+            : BorderSide(color: borderColor!),
+      ),
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: isLoading
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: resolvedIconColor,
+                    ),
+                  )
+                : Icon(icon, size: 17, color: resolvedIconColor),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _NotificationLeading extends StatelessWidget {
-  const _NotificationLeading({required this.item});
+  const _NotificationLeading({required this.item, required this.accent});
 
   final AppNotification item;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -461,15 +690,11 @@ class _NotificationLeading extends StatelessWidget {
               width: 18,
               height: 18,
               decoration: BoxDecoration(
-                color: AppColors.violet,
+                color: accent,
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.surfaceDark, width: 2),
               ),
-              child: Icon(
-                _typeIcon(item.type),
-                size: 10,
-                color: Colors.white,
-              ),
+              child: Icon(_typeIcon(item.type), size: 10, color: Colors.white),
             ),
           ),
         ],
@@ -483,7 +708,7 @@ class _NotificationLeading extends StatelessWidget {
         color: AppColors.surfaceElevatedDark,
         shape: BoxShape.circle,
       ),
-      child: Icon(_typeIcon(item.type), size: 18, color: AppColors.violet),
+      child: Icon(_typeIcon(item.type), size: 18, color: accent),
     );
   }
 
@@ -515,10 +740,10 @@ class _CaughtUpCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
-              'assets/images/notifications_bell.png',
+              'assets/images/auth_logo_m.png',
               width: 64,
               height: 64,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
               errorBuilder: (_, _, _) => Container(
                 width: 64,
                 height: 64,
@@ -534,8 +759,9 @@ class _CaughtUpCard extends StatelessWidget {
               children: [
                 Text(
                   "You're all caught up! 🎉",
-                  style: SettingsType.title(AppColors.textPrimaryDark)
-                      .copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+                  style: SettingsType.title(
+                    AppColors.textPrimaryDark,
+                  ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -561,10 +787,7 @@ Widget createNotificationsPage() {
 enum _NotificationSheetAction { markRead, notInterested, turnOffType }
 
 class _NotificationSheetTile extends StatelessWidget {
-  const _NotificationSheetTile({
-    required this.label,
-    required this.onTap,
-  });
+  const _NotificationSheetTile({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -575,10 +798,9 @@ class _NotificationSheetTile extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       title: Text(
         label,
-        style: SettingsType.body(AppColors.textPrimaryDark).copyWith(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
+        style: SettingsType.body(
+          AppColors.textPrimaryDark,
+        ).copyWith(fontSize: 15, fontWeight: FontWeight.w500),
       ),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

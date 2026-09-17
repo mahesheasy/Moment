@@ -8,19 +8,22 @@ import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/result/result.dart';
 import 'package:moment/core/theme/app_icons.dart';
+import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/core/widgets/moment_scaffold.dart';
 import 'package:moment/core/widgets/moment_sheet_dialog.dart';
 import 'package:moment/core/widgets/moment_states.dart';
+import 'package:moment/features/chat/data/chat_image_processor.dart';
 import 'package:moment/features/chat/presentation/cubit/chat_thread_cubit.dart';
 import 'package:moment/features/chat/presentation/models/moment_timeline_models.dart';
-import 'package:moment/features/chat/presentation/theme/moment_space_theme.dart';
 import 'package:moment/features/chat/presentation/utils/chat_message_actions.dart';
 import 'package:moment/features/chat/presentation/utils/moment_timeline_mapper.dart';
-import 'package:moment/features/chat/presentation/widgets/chat_edit_message_sheet.dart';
+import 'package:moment/features/chat/presentation/widgets/chat_edit_banner.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_message_actions_sheet.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_message_info_sheet.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_reply_banner.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_thread_blocked.dart';
+import 'package:moment/features/chat/presentation/widgets/chat_thread_restricted.dart';
+import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_thread_menu.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_thread_shimmer.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_typing_indicator.dart';
@@ -102,17 +105,18 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
   Future<void> _pickImage(BuildContext context) async {
     final file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      imageQuality: 82,
-      maxWidth: 1600,
+      imageQuality: 95,
+      maxWidth: ChatImageProcessor.maxDimension.toDouble(),
+      maxHeight: ChatImageProcessor.maxDimension.toDouble(),
     );
     if (file == null || !context.mounted) return;
 
-    final bytes = await file.readAsBytes();
-    final mime = file.mimeType ?? 'image/jpeg';
+    final rawBytes = await file.readAsBytes();
+    final bytes = ChatImageProcessor.prepareForUpload(rawBytes);
     if (!context.mounted) return;
     await context.read<ChatThreadCubit>().sendImage(
       bytes: bytes,
-      mimeType: mime,
+      mimeType: 'image/jpeg',
     );
   }
 
@@ -161,13 +165,12 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       case ChatMessageSheetAction.star:
         await cubit.toggleMessageStar(message.id);
       case ChatMessageSheetAction.edit:
-        final edited = await showChatEditMessageSheet(
-          context: context,
-          initialText: message.body,
+        cubit.setEditTo(message);
+        _inputController.text = message.body;
+        _inputController.selection = TextSelection.collapsed(
+          offset: message.body.length,
         );
-        if (edited != null && context.mounted) {
-          await cubit.editMessage(message.id, edited);
-        }
+        _composerFocus.requestFocus();
       case ChatMessageSheetAction.info:
         await showChatMessageInfoSheet(
           context: context,
@@ -184,13 +187,14 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       case ChatMessageSheetAction.deleteForMe:
         await cubit.deleteMessageForMe(message.id);
       case ChatMessageSheetAction.deleteForEveryone:
-        final ok = await MomentDialog.confirm(
+        final ok = await MomentBottomSheet.confirm(
           context,
           title: 'Delete for everyone?',
           message: 'This message will be removed for all participants.',
           confirmLabel: 'Delete',
+          destructive: true,
         );
-        if (ok == true && context.mounted) {
+        if (ok && context.mounted) {
           await cubit.deleteMessageForEveryone(message.id);
         }
     }
@@ -210,6 +214,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       action: action,
       onBlock: cubit.blockUser,
       onUnblock: cubit.unblockUser,
+      onReported: cubit.onUserReported,
     );
   }
 
@@ -231,7 +236,7 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
     final user = _resolvedUser;
     if (user == null) {
       return MomentScaffold(
-        backgroundColor: MomentSpaceTheme.background,
+        backgroundColor: context.mc.background,
         appBar: MomentAppBar(
           leading: IconButton(
             icon: const Icon(AppIcons.back, size: 20),
@@ -254,7 +259,8 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
       child: BlocConsumer<ChatThreadCubit, ChatThreadState>(
         listenWhen: (prev, next) =>
             prev.messages.length != next.messages.length ||
-            prev.errorMessage != next.errorMessage,
+            prev.errorMessage != next.errorMessage ||
+            prev.editingMessage != next.editingMessage,
         listener: (context, state) {
           if (state.errorMessage != null) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -276,14 +282,19 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
             currentUserId: currentUserId,
           );
           final isBlocked = state.isBlocked;
+          final isRestricted = state.isRestricted || state.reportAcknowledged;
+          final canCompose = state.canSendMessages && !state.reportAcknowledged;
           final showShimmer = !state.hasCompletedInitialLoad;
 
+          final threadUser = state.otherUser ?? user;
+
           return MomentScaffold(
-            backgroundColor: MomentSpaceTheme.background,
+            backgroundColor: context.mc.background,
             body: Column(
               children: [
                 MomentSpaceHeader(
-                  user: user,
+                  user: threadUser,
+                  isTyping: state.otherUserTyping,
                   showHero:
                       state.hasCompletedInitialLoad && state.messages.isNotEmpty,
                   onMenu: () => _onHeaderMenu(context, user),
@@ -306,6 +317,27 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                           relationship: state.relationship,
                           centered: true,
                         )
+                      : isRestricted && state.messages.isEmpty
+                      ? ChatThreadRestrictedNotice(
+                          user: user,
+                          relationship: state.relationship,
+                          reportAcknowledged: state.reportAcknowledged,
+                          primaryActionLabel: state.reportAcknowledged
+                              ? 'Back to chats'
+                              : state.relationship ==
+                                    FriendRelationship.requestReceived
+                              ? 'View profile'
+                              : 'Back to chats',
+                          onPrimaryAction: () {
+                            if (state.reportAcknowledged ||
+                                state.relationship !=
+                                    FriendRelationship.requestReceived) {
+                              context.pop();
+                              return;
+                            }
+                            context.push(AppRoutes.friend(user.id));
+                          },
+                        )
                       : MomentSpaceTimeline(
                           rows: rows,
                           otherUser: user,
@@ -313,13 +345,13 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                           onAddReaction: (entry) => _onReact(context, entry),
                           onLongPress: (MomentTimelineEntry entry) =>
                               _onMessageLongPress(context, entry),
-                          onReply: isBlocked
-                              ? null
-                              : (MomentTimelineEntry entry) =>
-                                    _onSwipeReply(context, entry),
+                          onReply: canCompose
+                              ? (MomentTimelineEntry entry) =>
+                                    _onSwipeReply(context, entry)
+                              : null,
                         ),
                 ),
-                if (!isBlocked) ...[
+                if (canCompose) ...[
                   if (state.otherUserTyping) ChatTypingIndicator(user: user),
                   if (state.replyTo != null)
                     ChatReplyBanner(
@@ -327,24 +359,38 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                       onClose: () =>
                           context.read<ChatThreadCubit>().clearReply(),
                     ),
+                  if (state.editingMessage != null)
+                    ChatEditBanner(
+                      onClose: () {
+                        context.read<ChatThreadCubit>().clearEdit();
+                        _inputController.clear();
+                      },
+                    ),
                   MomentSpaceComposer(
                     controller: _inputController,
                     focusNode: _composerFocus,
+                    isEditing: state.editingMessage != null,
                     isSending: state.status == ChatThreadStatus.sending,
                     onTextChanged: (text) => context
                         .read<ChatThreadCubit>()
                         .onComposerChanged(text),
                     onSend: () {
+                      final cubit = context.read<ChatThreadCubit>();
                       final text = _inputController.text;
                       if (text.trim().isEmpty) return;
+                      final editing = state.editingMessage;
                       _inputController.clear();
-                      context.read<ChatThreadCubit>().sendMessage(text);
+                      if (editing != null) {
+                        unawaited(cubit.editMessage(editing.messageId, text));
+                      } else {
+                        cubit.sendMessage(text);
+                      }
                     },
                     onPlus: () {},
                     onPickImage: () => _pickImage(context),
                     onSparkle: () => context.push(AppRoutes.camera),
                   ),
-                ] else
+                ] else if (isBlocked)
                   ChatThreadBlockedBar(
                     user: user,
                     relationship: state.relationship,
@@ -352,7 +398,9 @@ class _ChatThreadPageState extends State<ChatThreadPage> {
                     onUnblock: state.relationship == FriendRelationship.blocked
                         ? () => _confirmUnblock(context, user)
                         : null,
-                  ),
+                  )
+                else if (isRestricted)
+                  const ChatThreadRestrictedBar(),
               ],
             ),
           );

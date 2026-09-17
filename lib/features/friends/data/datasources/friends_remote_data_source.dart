@@ -171,7 +171,9 @@ class FriendsRemoteDataSource {
   Future<UserProfile> getProfile(String userId) async {
     final data = await _client
         .from('profiles')
-        .select()
+        .select(
+          'id, username, display_name, avatar_url, bio, created_at, last_seen_at',
+        )
         .eq('id', userId)
         .single();
     return ProfileModel.fromJson(Map<String, dynamic>.from(data)).toEntity();

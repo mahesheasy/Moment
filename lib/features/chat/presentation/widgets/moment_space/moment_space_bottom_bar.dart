@@ -24,7 +24,7 @@ class MomentSpaceBottomBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(6, 4, 6, 4 + bottom),
       decoration: BoxDecoration(
-        color: MomentSpaceTheme.background,
+        color: MomentSpaceTheme.background(context),
         border: Border(
           top: BorderSide(color: MomentSpaceTheme.border(context)),
         ),

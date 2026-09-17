@@ -21,7 +21,7 @@ class MomentTimelineDateDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     final line = Container(
       height: 1,
-      color: MomentSpaceTheme.timelineLine.withValues(alpha: 0.8),
+      color: MomentSpaceTheme.timelineLine(context).withValues(alpha: 0.8),
     );
     final text = Text(
       label,
@@ -94,6 +94,8 @@ class MomentTimelineCard extends StatelessWidget {
           entry: entry,
           mediaUrl: mediaUrl,
           onAddReaction: onAddReaction,
+          onLongPress: onLongPress,
+          onReply: onReply,
         ),
       MomentTimelineKind.voice => _VoiceMomentCard(
           entry: entry,
@@ -254,7 +256,7 @@ class _MediaThumb extends StatelessWidget {
               if (mediaUrl != null)
                 CachedNetworkImage(imageUrl: mediaUrl!, fit: BoxFit.cover)
               else
-                Container(color: MomentSpaceTheme.surfaceElevated),
+                Container(color: MomentSpaceTheme.surfaceElevated(context)),
               Container(color: Colors.black.withValues(alpha: 0.25)),
               Center(
                 child: Container(
@@ -337,12 +339,7 @@ class _ThoughtMomentCard extends StatelessWidget {
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: Text(
-              ChatFormatters.messageTime(entry.createdAt),
-              style: ChatTypography.bubbleMeta(
-                color: MomentSpaceTheme.textTertiary(context),
-              ),
-            ),
+            child: _MessageMetaRow(entry: entry),
           ),
         ],
       ),
@@ -435,27 +432,7 @@ class _MineTextCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        ChatFormatters.messageTime(entry.createdAt),
-                        style: ChatTypography.bubbleMeta(
-                          color: MomentSpaceTheme.textTertiary(context),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        entry.isRead
-                            ? Icons.done_all_rounded
-                            : Icons.done_rounded,
-                        size: 12,
-                        color: entry.isRead
-                            ? MomentSpaceTheme.readBlue
-                            : MomentSpaceTheme.textTertiary(context),
-                      ),
-                    ],
-                  ),
+                  _MessageMetaRow(entry: entry),
                 ],
               ),
             ),
@@ -471,79 +448,106 @@ class _PhotoMomentCard extends StatelessWidget {
     required this.entry,
     this.mediaUrl,
     this.onAddReaction,
+    this.onLongPress,
+    this.onReply,
   });
 
   final MomentTimelineEntry entry;
   final String? mediaUrl;
   final VoidCallback? onAddReaction;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onReply;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: -28,
-              top: 24,
-              child: Icon(
-                Icons.reply_rounded,
-                size: 18,
-                color: MomentSpaceTheme.textTertiary(context),
-              ),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(MomentSpaceTheme.cardRadius),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (mediaUrl != null)
-                      CachedNetworkImage(
-                        imageUrl: mediaUrl!,
-                        fit: BoxFit.cover,
-                      )
-                    else
-                      Container(color: MomentSpaceTheme.surfaceElevated),
-                    if (entry.overlayLabel != null)
-                      Positioned(
-                        left: 12,
-                        top: 12,
-                        child: Text(
-                          entry.overlayLabel!,
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.white,
-                            shadows: const [
-                              Shadow(
-                                color: Colors.black45,
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    Positioned(
-                      right: 12,
-                      bottom: 10,
-                      child: _ReadMeta(
-                        time: entry.createdAt,
-                        isMine: entry.isMine,
-                        isRead: entry.isRead,
+    final imageWidth =
+        (MediaQuery.sizeOf(context).width * 0.68).clamp(180.0, 280.0);
+
+    final photo = GestureDetector(
+      onLongPress: onLongPress,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: imageWidth,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(MomentSpaceTheme.cardRadius),
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              if (mediaUrl != null)
+                CachedNetworkImage(
+                  imageUrl: mediaUrl!,
+                  width: imageWidth,
+                  fit: BoxFit.fitWidth,
+                  placeholder: (_, _) => AspectRatio(
+                    aspectRatio: 1,
+                    child: ColoredBox(
+                      color: MomentSpaceTheme.surfaceElevated(context),
+                    ),
+                  ),
+                  errorWidget: (_, _, _) => AspectRatio(
+                    aspectRatio: 1,
+                    child: ColoredBox(
+                      color: MomentSpaceTheme.surfaceElevated(context),
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: MomentSpaceTheme.textTertiary(context),
                       ),
                     ),
-                  ],
+                  ),
+                )
+              else
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: ColoredBox(
+                    color: MomentSpaceTheme.surfaceElevated(context),
+                  ),
+                ),
+              if (entry.overlayLabel != null)
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  right: 12,
+                  child: Text(
+                    entry.overlayLabel!,
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.white,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black45,
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                right: 12,
+                bottom: 10,
+                child: _ReadMeta(
+                  time: entry.createdAt,
+                  isMine: entry.isMine,
+                  isRead: entry.isRead,
+                  isStarred: entry.isStarred,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment:
+          entry.isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        if (onReply != null)
+          ChatSwipeToReply(onReply: onReply!, child: photo)
+        else
+          photo,
         MomentReactionBar(
           reactions: entry.reactions,
           onAddReaction: onAddReaction,
@@ -758,28 +762,14 @@ class _SharedMomentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    ChatFormatters.messageTime(entry.createdAt),
-                    style: TextStyle(
-                      fontFamily: AppTypography.fontFamily,
-                      fontSize: 9,
-                      color: MomentSpaceTheme.textTertiary(context),
-                    ),
-                  ),
-                  const SizedBox(width: 3),
-                  Icon(
-                    entry.isRead
-                        ? Icons.done_all_rounded
-                        : Icons.done_rounded,
-                    size: 11,
-                    color: entry.isRead
-                        ? MomentSpaceTheme.readBlue
-                        : MomentSpaceTheme.textTertiary(context),
-                  ),
-                ],
+              _MessageMetaRow(
+                entry: entry,
+                timeStyle: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontSize: 9,
+                  color: MomentSpaceTheme.textTertiary(context),
+                ),
+                iconSize: 11,
               ),
             ],
           ),
@@ -789,22 +779,88 @@ class _SharedMomentCard extends StatelessWidget {
   }
 }
 
-class _ReadMeta extends StatelessWidget {
-  const _ReadMeta({
-    required this.time,
-    required this.isMine,
-    required this.isRead,
+class _MessageMetaRow extends StatelessWidget {
+  const _MessageMetaRow({
+    required this.entry,
+    this.timeStyle,
+    this.iconSize = 12,
   });
 
-  final DateTime time;
-  final bool isMine;
-  final bool isRead;
+  final MomentTimelineEntry entry;
+  final TextStyle? timeStyle;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (entry.isStarred) ...[
+          Icon(
+            Icons.star_rounded,
+            size: iconSize,
+            color: const Color(0xFFFFB020),
+          ),
+          const SizedBox(width: 3),
+        ],
+        if (entry.isEdited) ...[
+          Text(
+            'Edited',
+            style: timeStyle ??
+                ChatTypography.bubbleMeta(
+                  color: MomentSpaceTheme.textTertiary(context),
+                ),
+          ),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          ChatFormatters.messageTime(entry.createdAt),
+          style: timeStyle ??
+              ChatTypography.bubbleMeta(
+                color: MomentSpaceTheme.textTertiary(context),
+              ),
+        ),
+        if (entry.isMine) ...[
+          const SizedBox(width: 4),
+          Icon(
+            entry.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+            size: iconSize,
+            color: entry.isRead
+                ? MomentSpaceTheme.readBlue
+                : MomentSpaceTheme.textTertiary(context),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ReadMeta extends StatelessWidget {
+  const _ReadMeta({
+    required this.time,
+    required this.isMine,
+    required this.isRead,
+    this.isStarred = false,
+  });
+
+  final DateTime time;
+  final bool isMine;
+  final bool isRead;
+  final bool isStarred;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isStarred) ...[
+          const Icon(
+            Icons.star_rounded,
+            size: 12,
+            color: Color(0xFFFFB020),
+          ),
+          const SizedBox(width: 3),
+        ],
         Text(
           ChatFormatters.messageTime(time),
           style: TextStyle(

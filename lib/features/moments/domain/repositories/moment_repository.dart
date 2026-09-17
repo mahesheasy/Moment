@@ -1,4 +1,5 @@
 import 'package:moment/core/result/result.dart';
+import 'package:moment/core/widget/widget_moment_selector.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/widget_preferences/domain/entities/widget_preferences.dart';
 
@@ -6,6 +7,11 @@ abstract class MomentRepository {
   Future<Result<Moment?>> getLatestReceivedMoment();
 
   Future<Result<Moment?>> getWidgetMoment(WidgetPreferences preferences);
+
+  /// Unread-first widget moment with [WidgetMomentSelection.isUnread].
+  Future<Result<WidgetMomentSelection>> getWidgetDisplayMoment(
+    WidgetPreferences preferences,
+  );
 
   Future<Result<List<Moment>>> getWidgetMoments(
     WidgetPreferences preferences, {

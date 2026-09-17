@@ -10,6 +10,7 @@ import 'package:moment/core/firebase/firebase_bootstrap.dart';
 import 'package:moment/core/logging/app_logger.dart';
 import 'package:moment/core/navigation/memories_overlay_controller.dart';
 import 'package:moment/core/network/network_client.dart';
+import 'package:moment/core/presence/profile_presence_service.dart';
 import 'package:moment/core/push/push_bridge.dart';
 import 'package:moment/core/push/push_registration_service.dart';
 import 'package:moment/core/realtime/moment_realtime_subscriber.dart';
@@ -17,6 +18,7 @@ import 'package:moment/core/supabase/supabase_bootstrap.dart';
 import 'package:moment/core/widget/android_widget_bridge.dart';
 import 'package:moment/core/widget/home_widget_sync_service.dart';
 import 'package:moment/core/widget/widget_moment_stream_service.dart';
+import 'package:moment/core/widget/widget_read_cache.dart';
 import 'package:moment/features/auth/data/app_permissions_service.dart';
 import 'package:moment/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
@@ -24,6 +26,7 @@ import 'package:moment/features/auth/data/repositories/auth_repository_impl.dart
 import 'package:moment/features/auth/domain/repositories/auth_repository.dart';
 import 'package:moment/features/auth/domain/usecases/auth_usecases.dart';
 import 'package:moment/features/auth/presentation/cubit/auth_form_cubit.dart';
+import 'package:moment/features/auth/presentation/cubit/username_field_cubit.dart';
 import 'package:moment/features/chat/data/chat_media_resolver.dart';
 import 'package:moment/features/chat/data/datasources/chat_remote_data_source.dart';
 import 'package:moment/features/chat/data/repositories/chat_repository_impl.dart';
@@ -174,8 +177,13 @@ Future<void> configureDependencies({
   sl.registerLazySingleton<MomentsRemoteDataSource>(
     () => MomentsRemoteDataSource(sl()),
   );
+  sl.registerLazySingleton<WidgetReadCache>(WidgetReadCache.new);
   sl.registerLazySingleton<MomentRepository>(
-    () => MomentRepositoryImpl(sl(), () => sl<AuthRepository>().currentUserId),
+    () => MomentRepositoryImpl(
+      sl(),
+      () => sl<AuthRepository>().currentUserId,
+      sl(),
+    ),
   );
   sl.registerLazySingleton<SocialRemoteDataSource>(
     () => SocialRemoteDataSource(sl()),
@@ -280,7 +288,7 @@ Future<void> configureDependencies({
     ..registerLazySingleton(
       () => PushRegistrationService(sl(), sl<SupabaseClient>(), sl(), sl(), sl<AppEnv>()),
     )
-    ..registerLazySingleton(() => HomeWidgetSyncService(sl(), sl(), sl(), sl(), sl()))
+    ..registerLazySingleton(() => HomeWidgetSyncService(sl(), sl(), sl(), sl(), sl(), sl()))
     ..registerLazySingleton(
       () => WidgetMomentStreamService(sl(), sl(), sl(), sl(), sl(), sl()),
     )
@@ -308,6 +316,7 @@ Future<void> configureDependencies({
     )
     ..registerFactory(() => LoginCubit(sl(), sl()))
     ..registerFactory(() => RegisterCubit(sl()))
+    ..registerFactory(() => UsernameFieldCubit(sl()))
     ..registerFactory(() => ProfileCubit(sl(), sl(), sl(), sl(), sl(), sl()))
     ..registerFactory(() => AccountCubit(sl(), sl(), sl()))
     ..registerLazySingleton(() => const DeviceContactsDataSource())
@@ -333,15 +342,18 @@ Future<void> configureDependencies({
       (circleId, _) => CircleTodayCubit(sl(), sl(), sl(), circleId),
     )
     ..registerLazySingleton(() => ChatInboxCubit(sl(), sl()))
+    ..registerLazySingleton<ProfilePresenceService>(
+      () => ProfilePresenceService(sl(), sl(), sl(), sl()),
+    )
     ..registerFactoryParam<ChatThreadCubit, UserProfile, void>(
-      (otherUser, _) => ChatThreadCubit(sl(), sl(), otherUser),
+      (otherUser, _) => ChatThreadCubit(sl(), sl(), sl(), otherUser),
     )
     ..registerFactory(() => MemoryVaultCubit(sl(), sl(), sl(), sl()))
     ..registerFactory(() => TimeTravelCubit(sl()))
     ..registerFactory(() => PremiumCubit(sl()))
     ..registerFactory(() => ReportProblemCubit(sl()))
     ..registerFactory(() => NotificationSettingsCubit(sl(), sl()))
-    ..registerFactory(() => NotificationsCubit(sl()))
+    ..registerFactory(() => NotificationsCubit(sl(), sl()))
     ..registerFactory(
       () => WidgetCustomizationCubit(sl(), sl(), sl(), sl(), sl(), sl()),
     )
@@ -353,7 +365,7 @@ Future<void> configureDependencies({
     )
     ..registerFactory(() => CreateMemoryCubit(sl(), sl()))
     ..registerFactoryParam<MomentDetailCubit, String, void>(
-      (momentId, _) => MomentDetailCubit(sl(), sl(), momentId),
+      (momentId, _) => MomentDetailCubit(sl(), sl(), sl(), momentId),
     )
     ..registerLazySingleton(CirclesListRefresh.new)
     ..registerFactory(() => CirclesCubit(sl(), sl()))

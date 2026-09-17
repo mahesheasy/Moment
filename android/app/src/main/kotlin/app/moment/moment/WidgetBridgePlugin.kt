@@ -12,6 +12,9 @@ import app.moment.moment.widget.WidgetSyncCredentialsStore
 import app.moment.moment.widget.WidgetMediaDownloader
 import app.moment.moment.widget.WidgetMomentEntry
 import app.moment.moment.widget.WidgetMomentQueue
+import app.moment.moment.widget.WidgetOemReliability
+import app.moment.moment.widget.WidgetPrivacyOverridesStore
+import app.moment.moment.widget.WidgetRenderLatency
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -73,8 +76,10 @@ class WidgetBridgePlugin(
                         relativeTime = call.argument<String>("relativeTime") ?: "",
                         imageUrl = imageUrl?.takeIf { it.isNotBlank() },
                         avatarUrl = avatarUrl?.takeIf { it.isNotBlank() },
+                        isUnread = call.argument<Boolean>("isUnread") ?: true,
                     )
-                WidgetMomentQueue.upsertMoment(context, entry, promoteNew = true)
+                WidgetMomentQueue.setDisplayMoment(context, entry)
+                WidgetRenderLatency.begin(momentId, "realtime", entry.createdAtMillis)
                 WidgetMediaDownloader.enqueue(context, momentId, imageUrl, avatarUrl)
                 scope.launch {
                     MomentWidgetUpdater.updateIncomingMoment(context, momentId)
@@ -87,6 +92,7 @@ class WidgetBridgePlugin(
                 val moments = call.argument<List<Map<String, Any?>>>("moments")
                 if (!moments.isNullOrEmpty()) {
                     val showLatest = call.argument<Boolean>("showLatest") ?: true
+                    val replaceQueue = call.argument<Boolean>("replaceQueue") ?: false
                     val syncGeneration =
                         (call.argument<Number>("syncGeneration") ?: 0L).toLong()
                     val entries =
@@ -108,15 +114,20 @@ class WidgetBridgePlugin(
                                 relativeTime = map["relativeTime"] as? String ?: "",
                                 imageUrl = imageUrl?.takeIf { it.isNotBlank() },
                                 avatarUrl = avatarUrl?.takeIf { it.isNotBlank() },
+                                isUnread = map["isUnread"] as? Boolean ?: true,
                             )
                         }
                     if (entries.isNotEmpty()) {
-                        WidgetMomentQueue.mergeQueue(
-                            context,
-                            entries,
-                            showLatest = showLatest,
-                            syncGeneration = syncGeneration,
-                        )
+                        if (replaceQueue && entries.size == 1) {
+                            WidgetMomentQueue.setDisplayMoment(context, entries.first())
+                        } else {
+                            WidgetMomentQueue.mergeQueue(
+                                context,
+                                entries,
+                                showLatest = showLatest,
+                                syncGeneration = syncGeneration,
+                            )
+                        }
                         entries.forEach { entry ->
                             WidgetMediaDownloader.enqueue(
                                 context,
@@ -166,6 +177,16 @@ class WidgetBridgePlugin(
                 refreshWidget(result)
             }
 
+            "markMomentViewed" -> {
+                val momentId = call.argument<String>("momentId").orEmpty()
+                if (momentId.isNotBlank()) {
+                    WidgetMomentQueue.markViewed(context, momentId)
+                    refreshWidget(result, showLatest = false)
+                } else {
+                    result.success(null)
+                }
+            }
+
             "syncPreferences" -> {
                 val theme = call.argument<String>("theme") ?: "minimal"
                 val accentColor = call.argument<String>("accentColor") ?: "#FF6B8A"
@@ -186,6 +207,7 @@ class WidgetBridgePlugin(
                     lockScreenPrivacy = call.argument<Boolean>("lockScreenPrivacy"),
                     paused = call.argument<Boolean>("paused"),
                     privacyPersonId = call.argument<String>("privacyPersonId"),
+                    privacyOverridesJson = call.argument<String>("privacyOverridesJson"),
                     showStreak = call.argument<Boolean>("showStreak"),
                     streakCount = call.argument<Int>("streakCount"),
                 )
@@ -219,6 +241,10 @@ class WidgetBridgePlugin(
                         "lockScreenPrivacy" to data.lockScreenPrivacy,
                         "paused" to data.paused,
                         "privacyPersonId" to (prefs.getString(MomentWidgetDataStore.KEY_PRIVACY_PERSON, "") ?: ""),
+                        "privacyOverridesJson" to (
+                            prefs.getString(WidgetPrivacyOverridesStore.KEY_PRIVACY_OVERRIDES, "{}")
+                                ?: "{}"
+                        ),
                         "showStreak" to data.showStreak,
                         "streakCount" to data.streakCount,
                     ),
@@ -249,6 +275,20 @@ class WidgetBridgePlugin(
                 } else {
                     result.success(false)
                 }
+            }
+
+            "getBackgroundReliability" -> {
+                result.success(WidgetOemReliability.statusMap(context))
+            }
+
+            "requestBatteryOptimizationExemption" -> {
+                result.success(
+                    WidgetOemReliability.requestIgnoreBatteryOptimizations(context),
+                )
+            }
+
+            "openAutostartSettings" -> {
+                result.success(WidgetOemReliability.openAutostartSettings(context))
             }
 
             else -> result.notImplemented()
@@ -282,6 +322,11 @@ class WidgetBridgePlugin(
             runCatching {
                 val active = WidgetMomentQueue.activeEntry(context)
                 if (showLatest && active != null) {
+                    WidgetRenderLatency.begin(
+                        active.momentId,
+                        "flutter-sync",
+                        active.createdAtMillis,
+                    )
                     MomentWidgetUpdater.updateIncomingMoment(context, active.momentId)
                 } else {
                     MomentWidgetUpdater.updatePreservingView(context)

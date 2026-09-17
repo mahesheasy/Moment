@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
@@ -137,7 +136,7 @@ class _WidgetPrivacyView extends StatelessWidget {
                   relativeTime: state.previewStackMoments.isNotEmpty
                       ? state.previewStackMoments.first.relativeTime
                       : 'Just now',
-                  forcePrivacyMode: draft.privacyMode,
+                  forcePrivacyMode: draft.privacyForSender(previewPerson.id),
                   previewSize: 228,
                   streakCount: state.previewStreakCount,
                 ),
@@ -156,27 +155,36 @@ class _WidgetPrivacyView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               SettingsSection(
-                title: 'Apply to',
+                title: 'Per-person overrides',
                 children: [
-                  _ScopeRow(
-                    label: 'Everyone',
-                    subtitle: 'All senders use this privacy mode',
-                    selected: draft.privacyPersonId == null,
-                    onTap: () => cubit.setPrivacyPerson(null),
-                  ),
-                  ...state.friends.map(
-                    (friend) => _ScopeRow(
-                      label: friend.profile.displayName,
-                      subtitle: 'Only ${friend.profile.displayName}\'s moments',
-                      selected: draft.privacyPersonId == friend.profile.id,
-                      leading: MomentAvatar(
-                        name: friend.profile.displayName,
-                        imageUrl: friend.profile.avatarUrl,
-                        size: 28,
+                  if (state.friends.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: 12,
                       ),
-                      onTap: () => cubit.setPrivacyPerson(friend.profile.id),
+                      child: Text(
+                        'Add friends to set privacy per person.',
+                        style: SettingsType.body(AppColors.textSecondaryDark),
+                      ),
+                    )
+                  else
+                    ...state.friends.map(
+                      (friend) => _OverrideRow(
+                        name: friend.profile.displayName,
+                        avatarUrl: friend.profile.avatarUrl,
+                        effectiveMode: draft.privacyForSender(friend.profile.id),
+                        hasOverride:
+                            draft.privacyOverrides.containsKey(friend.profile.id),
+                        onTap: () => _showOverridePicker(
+                          context,
+                          cubit: cubit,
+                          senderId: friend.profile.id,
+                          senderName: friend.profile.displayName,
+                          draft: draft,
+                        ),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -190,6 +198,14 @@ class _WidgetPrivacyView extends StatelessWidget {
     WidgetPreferences draft,
     WidgetCustomizationState state,
   ) {
+    if (draft.privacyOverrides.isNotEmpty) {
+      final senderId = draft.privacyOverrides.keys.first;
+      final friend = state.friends
+          .where((f) => f.profile.id == senderId)
+          .map((f) => f.profile.displayName)
+          .firstOrNull;
+      return (id: senderId, name: friend ?? 'Friend');
+    }
     if (draft.privacyPersonId != null) {
       final friend = state.friends
           .where((f) => f.profile.id == draft.privacyPersonId)
@@ -197,7 +213,75 @@ class _WidgetPrivacyView extends StatelessWidget {
           .firstOrNull;
       return (id: draft.privacyPersonId!, name: friend ?? 'Friend');
     }
+    final firstFriend = state.friends.firstOrNull;
+    if (firstFriend != null) {
+      return (
+        id: firstFriend.profile.id,
+        name: firstFriend.profile.displayName,
+      );
+    }
     return (id: 'preview-sender', name: 'Jay');
+  }
+
+  void _showOverridePicker(
+    BuildContext context, {
+    required WidgetCustomizationCubit cubit,
+    required String senderId,
+    required String senderName,
+    required WidgetPreferences draft,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (context) {
+        final override = draft.privacyOverrides[senderId];
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Text(
+                  senderName,
+                  style: SettingsType.title(AppColors.textPrimaryDark),
+                ),
+              ),
+              ListTile(
+                title: Text(
+                  'Default (${draft.privacyMode.label})',
+                  style: SettingsType.body(AppColors.textPrimaryDark),
+                ),
+                trailing: MomentRadioIndicator(selected: override == null),
+                onTap: () {
+                  cubit.setPrivacyOverride(senderId, null);
+                  Navigator.of(context).pop();
+                },
+              ),
+              for (final mode in WidgetPrivacyMode.values)
+                ListTile(
+                  title: Text(
+                    mode.label,
+                    style: SettingsType.body(AppColors.textPrimaryDark),
+                  ),
+                  subtitle: Text(
+                    mode.description,
+                    style: SettingsType.caption(AppColors.textSecondaryDark),
+                  ),
+                  trailing: MomentRadioIndicator(selected: override == mode),
+                  onTap: () {
+                    cubit.setPrivacyOverride(senderId, mode);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -258,23 +342,27 @@ class _PrivacyRow extends StatelessWidget {
   }
 }
 
-class _ScopeRow extends StatelessWidget {
-  const _ScopeRow({
-    required this.label,
-    required this.subtitle,
-    required this.selected,
+class _OverrideRow extends StatelessWidget {
+  const _OverrideRow({
+    required this.name,
+    required this.effectiveMode,
+    required this.hasOverride,
     required this.onTap,
-    this.leading,
+    this.avatarUrl,
   });
 
-  final String label;
-  final String subtitle;
-  final bool selected;
+  final String name;
+  final String? avatarUrl;
+  final WidgetPrivacyMode effectiveMode;
+  final bool hasOverride;
   final VoidCallback onTap;
-  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = hasOverride
+        ? 'Override: ${effectiveMode.label}'
+        : 'Uses default (${effectiveMode.label})';
+
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -284,13 +372,14 @@ class _ScopeRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            if (leading != null) ...[leading!, const SizedBox(width: 12)],
+            MomentAvatar(name: name, imageUrl: avatarUrl, size: 28),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
+                    name,
                     style: SettingsType.title(AppColors.textPrimaryDark),
                   ),
                   Text(
@@ -300,7 +389,11 @@ class _ScopeRow extends StatelessWidget {
                 ],
               ),
             ),
-            MomentRadioIndicator(selected: selected),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondaryDark,
+              size: AppComponentSizes.iconSm,
+            ),
           ],
         ),
       ),

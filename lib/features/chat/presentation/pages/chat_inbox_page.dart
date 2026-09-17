@@ -13,6 +13,7 @@ import 'package:moment/features/chat/presentation/cubit/chat_inbox_cubit.dart';
 import 'package:moment/features/chat/presentation/theme/chat_theme.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_friend_chip.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_inbox_menu.dart';
+import 'package:moment/features/chat/presentation/widgets/chat_inbox_swipe_tile.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_inbox_tile.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_search_bar.dart';
 import 'package:moment/features/chat/presentation/widgets/chat_shimmer.dart';
@@ -48,6 +49,20 @@ class _ChatInboxViewState extends State<_ChatInboxView> {
 
   void _openThread(BuildContext context, UserProfile user) {
     context.push(AppRoutes.chatThread(user.id), extra: user);
+  }
+
+  Future<void> _togglePin(
+    BuildContext context,
+    ChatConversation conversation,
+  ) async {
+    final cubit = context.read<ChatInboxCubit>();
+    final error = conversation.isPinned
+        ? await cubit.unpinConversation(conversation.id)
+        : await cubit.pinConversation(conversation.id);
+    if (!context.mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error)),
+    );
   }
 
   Future<void> _showConversationMenu(
@@ -189,11 +204,11 @@ class _ChatInboxViewState extends State<_ChatInboxView> {
             state.status != ChatInboxStatus.error;
 
         return MomentScaffold(
-          backgroundColor: ChatTheme.threadBackground,
+          backgroundColor: ChatTheme.threadBackground(context),
           body: ColoredBox(
-            color: ChatTheme.threadBackdrop(context.isDarkMode),
+            color: ChatTheme.threadBackdrop(context),
             child: RefreshIndicator(
-              color: ChatTheme.accent,
+              color: ChatTheme.accent(context),
               onRefresh: () => context.read<ChatInboxCubit>().load(),
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -226,7 +241,7 @@ class _ChatInboxViewState extends State<_ChatInboxView> {
                                 Text(
                                   'Message your friends',
                                   style: ChatTypography.inboxSubtitle(
-                                    color: ChatTheme.tertiaryText,
+                                    color: ChatTheme.tertiaryText(context),
                                   ),
                                 ),
                               ],
@@ -288,17 +303,25 @@ class _ChatInboxViewState extends State<_ChatInboxView> {
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
                                 final conversation = conversations[index];
-                                return ChatInboxTile(
-                                  conversation: conversation,
-                                  isTyping: state.typingUserIds
-                                      .contains(conversation.otherUser.id),
+                                return ChatInboxSwipeTile(
+                                  isPinned: conversation.isPinned,
                                   onTap: () => _openThread(
                                     context,
                                     conversation.otherUser,
                                   ),
-                                  onLongPress: () => _showConversationMenu(
+                                  onPin: () => _togglePin(
                                     context,
                                     conversation,
+                                  ),
+                                  onMore: () => _showConversationMenu(
+                                    context,
+                                    conversation,
+                                  ),
+                                  child: ChatInboxTile(
+                                    conversation: conversation,
+                                    isTyping: state.typingUserIds.contains(
+                                      conversation.otherUser.id,
+                                    ),
                                   ),
                                 );
                               },
@@ -343,7 +366,7 @@ class _ChatEmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                gradient: ChatTheme.actionGradient,
+                gradient: ChatTheme.actionGradient(context),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -366,7 +389,7 @@ class _ChatEmptyState extends StatelessWidget {
                   : 'Add friends first, then come back to chat.',
               textAlign: TextAlign.center,
               style: ChatTypography.inboxSubtitle(
-                color: ChatTheme.tertiaryText,
+                color: ChatTheme.tertiaryText(context),
               ),
             ),
             if (onStartChat != null) ...[

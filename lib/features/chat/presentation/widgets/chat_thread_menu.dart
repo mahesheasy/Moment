@@ -79,6 +79,7 @@ Future<void> handleChatThreadMenuAction({
   required ChatThreadMenuAction action,
   Future<void> Function()? onBlock,
   Future<void> Function()? onUnblock,
+  VoidCallback? onReported,
 }) async {
   switch (action) {
     case ChatThreadMenuAction.viewProfile:
@@ -136,12 +137,20 @@ Future<void> handleChatThreadMenuAction({
       }
     case ChatThreadMenuAction.report:
       if (context.mounted) {
-        await _showReportSheet(context, user.id);
+        await _showReportSheet(
+          context,
+          user.id,
+          onReported: onReported,
+        );
       }
   }
 }
 
-Future<void> _showReportSheet(BuildContext context, String userId) async {
+Future<void> _showReportSheet(
+  BuildContext context,
+  String userId, {
+  VoidCallback? onReported,
+}) async {
   const reasons = ['Spam', 'Harassment', 'Inappropriate content', 'Other'];
   var selected = reasons.first;
   final detailsController = TextEditingController();
@@ -236,12 +245,7 @@ Future<void> _showReportSheet(BuildContext context, String userId) async {
                           }
                           if (context.mounted) {
                             Navigator.of(sheetContext).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Report submitted'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            onReported?.call();
                           }
                         },
                 ),

@@ -37,7 +37,7 @@ class ChatFriendChip extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: ChatTheme.sentBubble.withValues(alpha: 0.7),
+                      color: ChatTheme.sentBubble(context).withValues(alpha: 0.7),
                       width: 2,
                     ),
                   ),

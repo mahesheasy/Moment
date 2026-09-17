@@ -11,9 +11,23 @@ import 'package:moment/features/chat/presentation/utils/chat_formatters.dart';
 import 'package:moment/features/chat/presentation/utils/chat_message_actions.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/friends/domain/repositories/friends_repository.dart';
+import 'package:moment/features/profile/data/datasources/profile_remote_data_source.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
 
 enum ChatThreadStatus { initial, loading, ready, sending, error }
+
+class ChatEditTarget extends Equatable {
+  const ChatEditTarget({
+    required this.messageId,
+    required this.originalBody,
+  });
+
+  final String messageId;
+  final String originalBody;
+
+  @override
+  List<Object?> get props => [messageId, originalBody];
+}
 
 class ChatThreadState extends Equatable {
   const ChatThreadState({
@@ -23,10 +37,12 @@ class ChatThreadState extends Equatable {
     this.messages = const [],
     this.otherUserTyping = false,
     this.replyTo,
+    this.editingMessage,
     this.errorMessage,
     this.relationship = FriendRelationship.none,
     this.isActingOnRelationship = false,
     this.hasCompletedInitialLoad = false,
+    this.reportAcknowledged = false,
   });
 
   final ChatThreadStatus status;
@@ -35,14 +51,21 @@ class ChatThreadState extends Equatable {
   final List<ChatMessage> messages;
   final bool otherUserTyping;
   final ChatReplyTarget? replyTo;
+  final ChatEditTarget? editingMessage;
   final String? errorMessage;
   final FriendRelationship relationship;
   final bool isActingOnRelationship;
   final bool hasCompletedInitialLoad;
+  final bool reportAcknowledged;
 
   bool get isBlocked =>
       relationship == FriendRelationship.blocked ||
       relationship == FriendRelationship.blockedBy;
+
+  bool get canSendMessages => relationship == FriendRelationship.friends;
+
+  bool get isRestricted =>
+      hasCompletedInitialLoad && !canSendMessages && !isBlocked;
 
   ChatThreadState copyWith({
     ChatThreadStatus? status,
@@ -51,12 +74,15 @@ class ChatThreadState extends Equatable {
     List<ChatMessage>? messages,
     bool? otherUserTyping,
     ChatReplyTarget? replyTo,
+    ChatEditTarget? editingMessage,
     String? errorMessage,
     FriendRelationship? relationship,
     bool? isActingOnRelationship,
     bool? hasCompletedInitialLoad,
+    bool? reportAcknowledged,
     bool clearError = false,
     bool clearReply = false,
+    bool clearEditing = false,
   }) {
     return ChatThreadState(
       status: status ?? this.status,
@@ -65,12 +91,15 @@ class ChatThreadState extends Equatable {
       messages: messages ?? this.messages,
       otherUserTyping: otherUserTyping ?? this.otherUserTyping,
       replyTo: clearReply ? null : replyTo ?? this.replyTo,
+      editingMessage:
+          clearEditing ? null : editingMessage ?? this.editingMessage,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       relationship: relationship ?? this.relationship,
       isActingOnRelationship:
           isActingOnRelationship ?? this.isActingOnRelationship,
       hasCompletedInitialLoad:
           hasCompletedInitialLoad ?? this.hasCompletedInitialLoad,
+      reportAcknowledged: reportAcknowledged ?? this.reportAcknowledged,
     );
   }
 
@@ -82,10 +111,12 @@ class ChatThreadState extends Equatable {
     messages,
     otherUserTyping,
     replyTo,
+    editingMessage,
     errorMessage,
     relationship,
     isActingOnRelationship,
     hasCompletedInitialLoad,
+    reportAcknowledged,
   ];
 }
 
@@ -93,14 +124,18 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   ChatThreadCubit(
     this._repository,
     this._friendsRepository,
+    this._profileRemote,
     this._otherUser,
   ) : super(ChatThreadState(otherUser: _otherUser, status: ChatThreadStatus.loading));
 
   final ChatRepository _repository;
   final FriendsRepository _friendsRepository;
+  final ProfileRemoteDataSource _profileRemote;
   final UserProfile _otherUser;
   StreamSubscription<List<ChatMessage>>? _messagesSub;
   StreamSubscription<bool>? _typingSub;
+  StreamSubscription<DateTime?>? _presenceSub;
+  Timer? _presencePollTimer;
   Timer? _typingClearTimer;
   var _acceptStreamUpdates = false;
 
@@ -117,16 +152,45 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
 
     final relationship = await _loadRelationship();
 
+    unawaited(_profileRemote.touchLastSeen());
+    await _startPresenceWatch();
+
+    if (relationship != FriendRelationship.friends) {
+      if (relationship != FriendRelationship.blocked &&
+          relationship != FriendRelationship.blockedBy) {
+        emit(
+          state.copyWith(
+            status: ChatThreadStatus.ready,
+            relationship: relationship,
+            hasCompletedInitialLoad: true,
+            messages: const [],
+            clearError: true,
+          ),
+        );
+        return;
+      }
+    }
+
     final conversationResult = await _repository.getOrCreateConversation(
       _otherUser.id,
     );
     if (conversationResult is Failed) {
+      final message = conversationResult.failureOrNull?.message ?? '';
+      final isFriendsOnly = message.toLowerCase().contains(
+        'only chat with friends',
+      );
       emit(
         state.copyWith(
-          status: ChatThreadStatus.error,
-          relationship: relationship,
+          status: isFriendsOnly
+              ? ChatThreadStatus.ready
+              : ChatThreadStatus.error,
+          relationship: isFriendsOnly
+              ? FriendRelationship.none
+              : relationship,
           hasCompletedInitialLoad: true,
-          errorMessage: conversationResult.failureOrNull?.message,
+          messages: const [],
+          clearError: isFriendsOnly,
+          errorMessage: isFriendsOnly ? null : message,
         ),
       );
       return;
@@ -192,6 +256,50 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     _acceptStreamUpdates = true;
   }
 
+  Future<void> _startPresenceWatch() async {
+    await _presenceSub?.cancel();
+    _presencePollTimer?.cancel();
+
+    await _refreshOtherUserPresence();
+
+    _presenceSub = _profileRemote.watchLastSeen(_otherUser.id).listen(
+      (lastSeenAt) {
+        if (isClosed || lastSeenAt == null) return;
+        _applyLastSeen(lastSeenAt);
+      },
+      onError: (_) {},
+    );
+
+    _presencePollTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_refreshOtherUserPresence()),
+    );
+  }
+
+  Future<void> _refreshOtherUserPresence() async {
+    try {
+      final lastSeenAt = await _profileRemote.fetchLastSeen(_otherUser.id);
+      if (isClosed) return;
+      if (lastSeenAt != null) {
+        _applyLastSeen(lastSeenAt);
+        return;
+      }
+
+      final profile = await _profileRemote.getProfile(_otherUser.id);
+      if (!isClosed) {
+        emit(state.copyWith(otherUser: profile));
+      }
+    } on Object {
+      // Keep the profile passed into the thread if refresh fails.
+    }
+  }
+
+  void _applyLastSeen(DateTime lastSeenAt) {
+    final current = state.otherUser ?? _otherUser;
+    if (current.lastSeenAt == lastSeenAt) return;
+    emit(state.copyWith(otherUser: current.copyWith(lastSeenAt: lastSeenAt)));
+  }
+
   Future<FriendRelationship> _loadRelationship() async {
     final result = await _friendsRepository.getRelationship(_otherUser.id);
     if (result is Success<FriendRelationship>) {
@@ -203,6 +311,18 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   Future<void> refreshRelationship() async {
     final relationship = await _loadRelationship();
     emit(state.copyWith(relationship: relationship, clearReply: true));
+  }
+
+  void onUserReported() {
+    emit(
+      state.copyWith(
+        status: ChatThreadStatus.ready,
+        reportAcknowledged: true,
+        messages: const [],
+        clearError: true,
+        clearReply: true,
+      ),
+    );
   }
 
   Future<void> blockUser() async {
@@ -273,6 +393,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
       state.copyWith(
         clearError: true,
         clearReply: true,
+        clearEditing: true,
       ),
     );
     final result = await _repository.sendTextMessage(
@@ -335,6 +456,7 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     final otherName = _otherUser.displayName;
     emit(
       state.copyWith(
+        clearEditing: true,
         replyTo: ChatReplyTarget(
           messageId: message.id,
           senderName: message.isMine ? 'You' : otherName,
@@ -346,6 +468,21 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   }
 
   void clearReply() => emit(state.copyWith(clearReply: true));
+
+  void setEditTo(ChatMessage message) {
+    if (!message.canEdit) return;
+    emit(
+      state.copyWith(
+        clearReply: true,
+        editingMessage: ChatEditTarget(
+          messageId: message.id,
+          originalBody: message.body,
+        ),
+      ),
+    );
+  }
+
+  void clearEdit() => emit(state.copyWith(clearEditing: true));
 
   Future<void> reactToMessage(String messageId, String emoji) async {
     final userId = _repository.currentUserId;
@@ -461,12 +598,40 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
     final trimmed = body.trim();
     if (trimmed.isEmpty) return;
 
+    final message = messageById(messageId);
+    if (message == null || !message.canEdit) return;
+    if (trimmed == message.body) {
+      emit(state.copyWith(clearEditing: true));
+      return;
+    }
+
+    final optimisticEditedAt = DateTime.now().toUtc();
+    emit(
+      state.copyWith(
+        clearEditing: true,
+        messages: state.messages
+            .map(
+              (item) => item.id == messageId
+                  ? item.copyWith(body: trimmed, editedAt: optimisticEditedAt)
+                  : item,
+            )
+            .toList(),
+      ),
+    );
+
     final result = await _repository.editTextMessage(
       messageId: messageId,
       body: trimmed,
     );
     if (result is Failed && !isClosed) {
-      emit(state.copyWith(errorMessage: result.failureOrNull?.message));
+      emit(
+        state.copyWith(
+          messages: state.messages
+              .map((item) => item.id == messageId ? message : item)
+              .toList(),
+          errorMessage: result.failureOrNull?.message,
+        ),
+      );
       return;
     }
 
@@ -493,11 +658,13 @@ class ChatThreadCubit extends Cubit<ChatThreadState> {
   Future<void> close() async {
     _acceptStreamUpdates = false;
     _typingClearTimer?.cancel();
+    _presencePollTimer?.cancel();
     final conversationId = state.conversationId;
     if (conversationId != null) {
       unawaited(_repository.setTyping(conversationId, isTyping: false));
     }
     await _typingSub?.cancel();
+    await _presenceSub?.cancel();
     await _messagesSub?.cancel();
     return super.close();
   }

@@ -20,7 +20,7 @@ object WidgetSupabaseSync {
 
         var rows =
             runCatching {
-                fetchRecipientRows(credentials)
+                fetchRecipientRows(credentials, unseenOnly = true)
             }.getOrElse { error ->
                 WidgetMomentSyncLog.error("Background sync fetch failed", error)
                 return false
@@ -31,15 +31,33 @@ object WidgetSupabaseSync {
             if (!refreshed) return false
             credentials = WidgetSyncCredentialsStore.load(appContext) ?: return false
             rows =
-                runCatching { fetchRecipientRows(credentials) }.getOrNull() ?: return false
+                runCatching { fetchRecipientRows(credentials, unseenOnly = true) }.getOrNull()
         }
 
-        val entries = parseEntries(appContext, credentials, rows)
-        if (entries.isEmpty()) return false
+        if (rows == null || rows.length() == 0) {
+            MomentWidgetDataStore.clearActiveMoment(appContext)
+            runBlocking {
+                MomentWidgetUpdater.updatePreservingView(appContext)
+            }
+            return true
+        }
 
-        val beforeId = WidgetMomentQueue.activeEntry(appContext)?.momentId
-        WidgetMomentQueue.mergeQueue(appContext, entries, showLatest = promoteLatest)
-        val afterId = WidgetMomentQueue.activeEntry(appContext)?.momentId
+        val entries =
+            parseEntries(credentials, rows).filter { entry ->
+                !WidgetSeenOnDeviceStore.isSeen(appContext, entry.momentId)
+            }
+        if (entries.isEmpty()) {
+            MomentWidgetDataStore.clearActiveMoment(appContext)
+            runBlocking {
+                MomentWidgetUpdater.updatePreservingView(appContext)
+            }
+            return true
+        }
+
+        val display = entries.first()
+        WidgetMomentQueue.setDisplayMoment(appContext, display)
+
+        val afterId = display.momentId
 
         entries.forEach { entry ->
             WidgetMediaDownloader.enqueue(
@@ -51,25 +69,27 @@ object WidgetSupabaseSync {
         }
 
         runBlocking {
-            if (promoteLatest || (afterId != null && afterId != beforeId)) {
-                MomentWidgetUpdater.updateIncomingMoment(appContext, afterId!!)
-            } else {
-                MomentWidgetUpdater.updatePreservingView(appContext)
-            }
+            WidgetRenderLatency.begin(afterId, "background-sync", display.createdAtMillis)
+            MomentWidgetUpdater.updateIncomingMoment(appContext, afterId)
         }
         WidgetMomentSyncLog.fcmReceived("background-sync:${entries.size}")
         return true
     }
 
-    private fun fetchRecipientRows(credentials: WidgetSyncCredentials): JSONArray? {
+    private fun fetchRecipientRows(
+        credentials: WidgetSyncCredentials,
+        unseenOnly: Boolean,
+    ): JSONArray? {
         val select =
-            "moment:moments(id,created_at,caption,storage_path,sender:sender_id(id,display_name,avatar_url))"
+            "seen_at,moment:moments(id,created_at,caption,storage_path,sender:sender_id(id,display_name,avatar_url))"
+        val unseenFilter = if (unseenOnly) "&seen_at=is.null" else ""
         val urlString =
             "${credentials.supabaseUrl}/rest/v1/moment_recipients" +
                 "?recipient_id=eq.${credentials.userId}" +
+                unseenFilter +
                 "&select=${URLEncoder.encode(select, "UTF-8")}" +
                 "&order=created_at.desc" +
-                "&limit=5"
+                "&limit=1"
         val url = URL(urlString)
         val connection = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 12_000
@@ -118,13 +138,14 @@ object WidgetSupabaseSync {
     }
 
     private fun parseEntries(
-        context: Context,
         credentials: WidgetSyncCredentials,
         rows: JSONArray,
     ): List<WidgetMomentEntry> {
         val entries = mutableListOf<WidgetMomentEntry>()
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
+            val seenAt = row.optString("seen_at")
+            val isUnread = seenAt.isBlank() || seenAt == "null"
             val moment = row.optJSONObject("moment") ?: continue
             val momentId = moment.optString("id")
             if (momentId.isBlank()) continue
@@ -167,6 +188,7 @@ object WidgetSupabaseSync {
                         },
                     imageUrl = imageUrl,
                     avatarUrl = avatarUrl,
+                    isUnread = isUnread,
                 ),
             )
         }

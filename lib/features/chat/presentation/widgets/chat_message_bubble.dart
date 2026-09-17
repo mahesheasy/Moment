@@ -138,12 +138,12 @@ class _BubbleBody extends StatelessWidget {
     );
 
     final bubbleColor = isMine
-        ? ChatTheme.sentBubbleFor(isDark)
-        : ChatTheme.receivedBubbleFor(isDark);
+        ? ChatTheme.sentBubble(context)
+        : ChatTheme.receivedBubble(context);
 
     final textColor = isMine
         ? Colors.white
-        : ChatTheme.primaryText(isDark);
+        : ChatTheme.primaryText(context);
 
     final bubble = DecoratedBox(
       decoration: BoxDecoration(
@@ -214,22 +214,22 @@ class _ImageBubble extends StatelessWidget {
             placeholder: (_, _) => Container(
               width: 220,
               height: 160,
-              color: ChatTheme.receivedBubble,
-              child: const Center(
+              color: ChatTheme.receivedBubble(context),
+              child: Center(
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: ChatTheme.tertiaryText,
+                  color: ChatTheme.tertiaryText(context),
                 ),
               ),
             ),
             errorWidget: (_, _, _) => Container(
               width: 220,
               height: 120,
-              color: ChatTheme.receivedBubble,
+              color: ChatTheme.receivedBubble(context),
               alignment: Alignment.center,
               child: Icon(
                 Icons.broken_image_outlined,
-                color: ChatTheme.tertiaryText.withValues(alpha: 0.7),
+                color: ChatTheme.tertiaryText(context).withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -295,7 +295,7 @@ class _TimestampRow extends StatelessWidget {
           ChatFormatters.messageTime(time),
           style: TextStyle(
             fontFamily: AppTypography.fontFamily,
-            color: ChatTheme.tertiaryText,
+            color: ChatTheme.tertiaryText(context),
             fontSize: 11,
             fontWeight: FontWeight.w400,
           ),

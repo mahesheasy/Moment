@@ -69,10 +69,6 @@ class _SettingsView extends StatelessWidget {
               title: 'Widget',
               children: [
                 SettingsNavRow(
-                  label: 'Widget setup',
-                  onTap: () => context.push(AppRoutes.widgetSettings),
-                ),
-                SettingsNavRow(
                   label: 'Widget customize',
                   onTap: () => context.push(AppRoutes.widgetCustomize),
                 ),
@@ -112,6 +108,20 @@ class _SettingsView extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xxl),
             SettingsSection(
+              title: 'Legal',
+              children: [
+                SettingsNavRow(
+                  label: 'Terms of Service',
+                  onTap: () => context.push(AppRoutes.termsOfService),
+                ),
+                SettingsNavRow(
+                  label: 'Privacy Policy',
+                  onTap: () => context.push(AppRoutes.privacyPolicy),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            SettingsSection(
               title: 'Session',
               children: [
                 SettingsNavRow(
@@ -132,6 +142,14 @@ class _SettingsView extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
+    final confirmed = await MomentBottomSheet.confirm(
+      context,
+      title: 'Sign out?',
+      message: "You'll need to sign in again to use Moment.",
+      confirmLabel: 'Sign out',
+    );
+    if (!confirmed || !context.mounted) return;
+
     await context.read<AccountCubit>().logout();
     if (context.mounted) {
       context.go(AppRoutes.login);
@@ -139,15 +157,16 @@ class _SettingsView extends StatelessWidget {
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
-    final confirmed = await MomentDialog.confirm(
+    final confirmed = await MomentBottomSheet.confirm(
       context,
       title: 'Delete account?',
       message:
           'This permanently removes your account and profile. This cannot be undone.',
       confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (confirmed == true && context.mounted) {
-      await context.read<AccountCubit>().deleteAccount();
-    }
+    if (!confirmed || !context.mounted) return;
+
+    await context.read<AccountCubit>().deleteAccount();
   }
 }

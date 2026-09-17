@@ -48,6 +48,13 @@ class DeepLinkMapper {
         return AppRoutes.chatThread(firstSegment);
       case 'friends':
         return AppRoutes.friends;
+      case 'friend':
+        if (firstSegment == null || firstSegment.isEmpty) {
+          final queryId = uri.queryParameters['id'];
+          if (queryId == null || queryId.isEmpty) return null;
+          return AppRoutes.friend(queryId);
+        }
+        return AppRoutes.friend(firstSegment);
       default:
         if (host.isEmpty && uri.path == AppRoutes.camera) {
           return AppRoutes.camera;

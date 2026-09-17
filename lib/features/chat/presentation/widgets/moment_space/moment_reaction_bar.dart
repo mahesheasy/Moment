@@ -49,7 +49,7 @@ class _ReactionPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: MomentSpaceTheme.surfaceElevated,
+        color: MomentSpaceTheme.surfaceElevated(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: MomentSpaceTheme.border(context)),
       ),
@@ -90,7 +90,7 @@ class _AddReactionButton extends StatelessWidget {
           height: 26,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: MomentSpaceTheme.surfaceElevated,
+            color: MomentSpaceTheme.surfaceElevated(context),
             border: Border.all(color: MomentSpaceTheme.border(context)),
           ),
           child: Icon(

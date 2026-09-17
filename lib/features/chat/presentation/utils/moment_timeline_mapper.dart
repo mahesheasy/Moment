@@ -64,22 +64,36 @@ abstract final class MomentTimelineMapper {
 
       switch (message.messageType) {
         case ChatMessageType.image:
+          if (message.deletedForEveryone) {
+            return MomentTimelineEntry(
+              id: message.id,
+              kind: MomentTimelineKind.thought,
+              createdAt: message.createdAt,
+              isMine: message.isMine,
+              body: body,
+              reactions: reactions,
+              replyPreview: replyPreview,
+              isDeleted: true,
+              isRead: message.isRead,
+              isStarred: message.isStarred,
+              isEdited: message.editedAt != null,
+            );
+          }
+          final caption = _imageCaption(message.body);
           return MomentTimelineEntry(
             id: message.id,
             kind: MomentTimelineKind.photo,
             createdAt: message.createdAt,
             isMine: message.isMine,
-            body: message.deletedForEveryone
-                ? body
-                : (message.body.trim().isNotEmpty ? message.body : null),
-            overlayLabel: message.deletedForEveryone
-                ? null
-                : (message.body.trim().isNotEmpty ? message.body : null),
-            mediaUrl: message.deletedForEveryone ? null : message.mediaUrl,
+            body: caption,
+            overlayLabel: caption,
+            mediaUrl: message.mediaUrl,
             reactions: reactions,
             replyPreview: replyPreview,
-            isDeleted: message.deletedForEveryone,
+            isDeleted: false,
             isRead: message.isRead,
+            isStarred: message.isStarred,
+            isEdited: message.editedAt != null,
           );
         case ChatMessageType.snap:
           return MomentTimelineEntry(
@@ -96,6 +110,8 @@ abstract final class MomentTimelineMapper {
             replyPreview: replyPreview,
             isDeleted: message.deletedForEveryone,
             isRead: message.isRead,
+            isStarred: message.isStarred,
+            isEdited: message.editedAt != null,
           );
         case ChatMessageType.text:
           return MomentTimelineEntry(
@@ -108,6 +124,8 @@ abstract final class MomentTimelineMapper {
             replyPreview: replyPreview,
             isDeleted: message.deletedForEveryone,
             isRead: message.isRead,
+            isStarred: message.isStarred,
+            isEdited: message.editedAt != null,
           );
       }
     }).toList();
@@ -150,7 +168,8 @@ abstract final class MomentTimelineMapper {
     }
 
     final preview = switch (reply.messageType) {
-      ChatMessageType.image => reply.body.trim().isEmpty ? 'Photo' : reply.body,
+      ChatMessageType.image =>
+        _imageCaption(reply.body) ?? 'Photo',
       ChatMessageType.snap => 'Shared a moment',
       ChatMessageType.text => reply.body,
     };
@@ -160,6 +179,12 @@ abstract final class MomentTimelineMapper {
       body: preview,
       isMine: replyIsMine,
     );
+  }
+
+  static String? _imageCaption(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed == 'Photo') return null;
+    return trimmed;
   }
 
   static String _dateLabel(DateTime time) {

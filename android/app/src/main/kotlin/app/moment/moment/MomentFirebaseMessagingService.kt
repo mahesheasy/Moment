@@ -56,6 +56,8 @@ import app.moment.moment.widget.WidgetMomentSyncLog
 
 import app.moment.moment.widget.WidgetMomentQueue
 
+import app.moment.moment.widget.WidgetRenderLatency
+
 import app.moment.moment.widget.WidgetSyncScheduler
 
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -124,6 +126,8 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
             "chat_reaction" -> handleChatReactionMessage(data)
 
             "friend_request" -> handleFriendRequestMessage(data)
+
+            "friend_accepted" -> handleFriendAcceptedMessage(data)
 
             "reaction" -> handleReactionMessage(data)
 
@@ -194,6 +198,20 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
+    private fun handleFriendAcceptedMessage(data: Map<String, String>) {
+
+        if (!NotificationPreferencesStore.shouldShowNotification(applicationContext, "friend_request")) {
+
+            return
+
+        }
+
+        runCatching { postFriendAcceptedNotification(data) }
+
+    }
+
+
+
     private fun handleReactionMessage(data: Map<String, String>) {
 
         if (!NotificationPreferencesStore.shouldShowNotification(applicationContext, "reaction")) {
@@ -212,7 +230,11 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
         if (!canPostNotifications()) return
 
-        ensureChannel(CHAT_CHANNEL_ID, getString(R.string.chat_notification_channel))
+        ensureChannel(
+            CHAT_CHANNEL_ID,
+            getString(R.string.chat_notification_channel),
+            getString(R.string.chat_notification_channel_desc),
+        )
 
 
 
@@ -282,18 +304,17 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-        val notification = baseNotificationBuilder(CHAT_CHANNEL_ID, avatarBitmap)
-
+        val notification = MomentNotificationBuilder.create(
+            this,
+            CHAT_CHANNEL_ID,
+            MomentNotificationBuilder.Kind.CHAT,
+            avatarBitmap,
+        )
             .setContentTitle(senderName)
-
             .setContentText(body)
-
             .setStyle(style)
-
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-
             .setContentIntent(pendingIntent)
-
             .build()
 
 
@@ -310,7 +331,11 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
         if (!canPostNotifications()) return
 
-        ensureChannel(CHAT_CHANNEL_ID, getString(R.string.chat_notification_channel))
+        ensureChannel(
+            CHAT_CHANNEL_ID,
+            getString(R.string.chat_notification_channel),
+            getString(R.string.chat_notification_channel_desc),
+        )
 
 
 
@@ -382,18 +407,17 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-        val notification = baseNotificationBuilder(CHAT_CHANNEL_ID, avatarBitmap)
-
+        val notification = MomentNotificationBuilder.create(
+            this,
+            CHAT_CHANNEL_ID,
+            MomentNotificationBuilder.Kind.CHAT,
+            avatarBitmap,
+        )
             .setContentTitle(senderName)
-
             .setContentText(body)
-
             .setStyle(style)
-
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-
             .setContentIntent(pendingIntent)
-
             .build()
 
 
@@ -410,7 +434,11 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
         if (!canPostNotifications()) return
 
-        ensureChannel(FRIEND_CHANNEL_ID, getString(R.string.friend_request_notification_channel))
+        ensureChannel(
+            FRIEND_CHANNEL_ID,
+            getString(R.string.friend_request_notification_channel),
+            "Friend requests and new connections",
+        )
 
 
 
@@ -456,16 +484,16 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-        val notification = baseNotificationBuilder(FRIEND_CHANNEL_ID, avatarBitmap)
-
+        val notification = MomentNotificationBuilder.create(
+            this,
+            FRIEND_CHANNEL_ID,
+            MomentNotificationBuilder.Kind.FRIEND,
+            avatarBitmap,
+        )
             .setContentTitle(senderName)
-
             .setContentText(body)
-
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
-
             .setContentIntent(pendingIntent)
-
             .build()
 
 
@@ -478,11 +506,92 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
+    private fun postFriendAcceptedNotification(data: Map<String, String>) {
+
+        if (!canPostNotifications()) return
+
+        ensureChannel(
+            FRIEND_CHANNEL_ID,
+            getString(R.string.friend_request_notification_channel),
+            "Friend requests and new connections",
+        )
+
+
+
+        val friendId = data["friendId"].orEmpty()
+
+        val requestId = data["requestId"].orEmpty()
+
+        val friendName = data["notificationTitle"] ?: data["friendName"] ?: "Someone"
+
+        val body = data["notificationBody"]
+            ?: "accepted your friend request. Send them your first moment!"
+
+        val avatarBitmap = loadCircularAvatarBitmap(data["avatarUrl"])
+
+
+
+        val intent = Intent(
+
+            Intent.ACTION_VIEW,
+
+            Uri.parse("moment://friend/$friendId"),
+
+        ).apply {
+
+            setClassName(packageName, "$packageName.MainActivity")
+
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+        }
+
+
+
+        val pendingIntent = PendingIntent.getActivity(
+
+            this,
+
+            "friend_accepted_$requestId".hashCode(),
+
+            intent,
+
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+
+        )
+
+
+
+        val notification = MomentNotificationBuilder.create(
+            this,
+            FRIEND_CHANNEL_ID,
+            MomentNotificationBuilder.Kind.FRIEND,
+            avatarBitmap,
+        )
+            .setContentTitle(friendName)
+            .setContentText(body)
+            .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+            .setContentIntent(pendingIntent)
+            .build()
+
+
+
+        NotificationManagerCompat.from(this)
+
+            .notify("friend_accepted_$requestId".hashCode(), notification)
+
+    }
+
+
+
     private fun postReactionNotification(data: Map<String, String>) {
 
         if (!canPostNotifications()) return
 
-        ensureChannel(CHANNEL_ID, getString(R.string.moment_notification_channel))
+        ensureChannel(
+            CHANNEL_ID,
+            getString(R.string.moment_notification_channel),
+            getString(R.string.moment_notification_channel_desc),
+        )
 
 
 
@@ -520,22 +629,22 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-        val notification = baseNotificationBuilder(CHANNEL_ID)
+        val reactorName = data["notificationTitle"] ?: data["reactorName"] ?: "Someone"
+        val body =
+            data["notificationBody"]
+                ?: "reacted ${data["reactionEmoji"] ?: "❤️"} to your moment"
+        val avatarBitmap = loadCircularAvatarBitmap(data["avatarUrl"])
 
-            .setContentTitle(data["notificationTitle"] ?: data["reactorName"])
-
-            .setContentText(
-
-                data["notificationBody"]
-
-                    ?: "reacted ${data["reactionEmoji"] ?: "❤️"} to your moment",
-
-            )
-
+        val notification = MomentNotificationBuilder.create(
+            this,
+            CHANNEL_ID,
+            MomentNotificationBuilder.Kind.REACTION,
+            avatarBitmap,
+        )
+            .setContentTitle(reactorName)
+            .setContentText(body)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
-
             .setContentIntent(pendingIntent)
-
             .build()
 
 
@@ -554,6 +663,7 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
         WidgetMomentSyncLog.fcmReceived(entry.momentId)
+        WidgetRenderLatency.begin(entry.momentId, "fcm", entry.createdAtMillis)
 
         WidgetMomentQueue.upsertMoment(
             applicationContext,
@@ -594,7 +704,11 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
         if (!canPostNotifications()) return
 
-        ensureChannel(CHANNEL_ID, getString(R.string.moment_notification_channel))
+        ensureChannel(
+            CHANNEL_ID,
+            getString(R.string.moment_notification_channel),
+            getString(R.string.moment_notification_channel_desc),
+        )
 
 
 
@@ -630,17 +744,30 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-        val notification = baseNotificationBuilder(CHANNEL_ID)
+        val senderName = data["notificationTitle"] ?: data["senderName"] ?: "Someone"
+        val body = data["notificationBody"] ?: "sent you a moment"
+        val avatarBitmap = loadCircularAvatarBitmap(data["avatarUrl"])
+        val momentBitmap =
+            loadDecodedBitmap(data["imageUrl"].orEmpty().ifBlank { data.fcm("image_url") })
 
-            .setContentTitle(data["notificationTitle"] ?: data["senderName"])
-
-            .setContentText(data["notificationBody"] ?: "sent you a moment")
-
+        val builder = MomentNotificationBuilder.create(
+            this,
+            CHANNEL_ID,
+            MomentNotificationBuilder.Kind.MOMENT,
+            avatarBitmap,
+        )
+            .setContentTitle(senderName)
+            .setContentText(body)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
-
             .setContentIntent(pendingIntent)
 
-            .build()
+        if (momentBitmap != null) {
+            builder.setStyle(
+                MomentNotificationBuilder.bigPictureStyle(momentBitmap, body),
+            )
+        }
+
+        val notification = builder.build()
 
 
 
@@ -652,153 +779,58 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-    private fun baseNotificationBuilder(
-
-        channelId: String,
-
-        avatarBitmap: Bitmap? = null,
-
-    ): NotificationCompat.Builder {
-
-        val builder = NotificationCompat.Builder(this, channelId)
-
-            .setSmallIcon(R.drawable.ic_notification)
-
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-
-            .setAutoCancel(true)
-
-
-
-        val largeIcon = avatarBitmap ?: loadLargeAppIcon()
-
-        largeIcon?.let { builder.setLargeIcon(it) }
-
-        return builder
-
+    private fun ensureChannel(channelId: String, name: String, description: String) {
+        MomentNotificationBuilder.ensureChannel(this, channelId, name, description)
     }
-
-
 
     private fun loadCircularAvatarBitmap(url: String?): Bitmap? {
-
         if (url.isNullOrBlank()) return null
-
         return runCatching {
-
             val bytes = downloadBytes(url) ?: return null
-
             val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
-
             circleCropBitmap(decoded)
-
         }.getOrNull()
-
     }
-
-
 
     private fun downloadBytes(url: String): ByteArray? {
-
         return try {
-
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-
                 connectTimeout = 10_000
-
                 readTimeout = 15_000
-
                 requestMethod = "GET"
-
             }
-
-            connection.use { conn ->
-
+            connection.useConnection { conn ->
                 val bytes = conn.inputStream.readBytes()
-
                 bytes.takeIf { it.isNotEmpty() }
-
             }
-
         } catch (_: Exception) {
-
             null
-
         }
-
     }
 
-
+    private fun loadDecodedBitmap(url: String?): Bitmap? {
+        if (url.isNullOrBlank()) return null
+        return runCatching {
+            val bytes = downloadBytes(url) ?: return null
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull()
+    }
 
     private fun circleCropBitmap(source: Bitmap): Bitmap {
-
         val size = minOf(source.width, source.height)
-
         val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-
         val canvas = Canvas(output)
-
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
         val rect = Rect(0, 0, size, size)
-
         canvas.drawARGB(0, 0, 0, 0)
-
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-
         paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-
         canvas.drawBitmap(source, null, rect, paint)
-
         if (source != output) {
-
             source.recycle()
-
         }
-
         return output
-
     }
-
-
-
-    private fun loadLargeAppIcon(): Bitmap? {
-
-        return runCatching {
-
-            drawableToBitmap(packageManager.getApplicationIcon(applicationInfo))
-
-        }.getOrNull()
-
-    }
-
-
-
-    private fun drawableToBitmap(drawable: Drawable): Bitmap {
-
-        if (drawable is BitmapDrawable && drawable.bitmap != null) {
-
-            return drawable.bitmap
-
-        }
-
-        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 128
-
-        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 128
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-        val canvas = Canvas(bitmap)
-
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
-
-        drawable.draw(canvas)
-
-        return bitmap
-
-    }
-
-
 
     private fun canPostNotifications(): Boolean {
 
@@ -820,31 +852,7 @@ class MomentFirebaseMessagingService : FirebaseMessagingService() {
 
 
 
-    private fun ensureChannel(channelId: String, name: String) {
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        manager.createNotificationChannel(
-
-            NotificationChannel(
-
-                channelId,
-
-                name,
-
-                NotificationManager.IMPORTANCE_HIGH,
-
-            ),
-
-        )
-
-    }
-
-
-
-    private inline fun <T> HttpURLConnection.use(block: (HttpURLConnection) -> T): T {
+    private inline fun <T> HttpURLConnection.useConnection(block: (HttpURLConnection) -> T): T {
 
         return try {
 

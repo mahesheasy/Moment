@@ -82,13 +82,13 @@ class _Chip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? ChatTheme.accentPink.withValues(alpha: 0.18)
+              ? ChatTheme.accentPink(context).withValues(alpha: 0.18)
               : const Color(0xFF1E1E22),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
-                ? ChatTheme.accentPink.withValues(alpha: 0.45)
-                : ChatTheme.inputBorder,
+                ? ChatTheme.accentPink(context).withValues(alpha: 0.45)
+                : ChatTheme.inputBorder(context),
           ),
         ),
         child: Row(
@@ -98,7 +98,7 @@ class _Chip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontFamily: AppTypography.fontFamily,
-                color: selected ? Colors.white : ChatTheme.tertiaryText,
+                color: selected ? Colors.white : ChatTheme.tertiaryText(context),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -108,7 +108,7 @@ class _Chip extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: ChatTheme.accentPink,
+                  color: ChatTheme.accentPink(context),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(

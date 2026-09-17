@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:moment/core/utils/relative_time.dart';
+import 'package:moment/core/widget/widget_background_reliability.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/widget_preferences/domain/entities/widget_preferences.dart';
 
@@ -15,6 +17,7 @@ class AndroidWidgetBridge {
     required WidgetPreferences preferences,
     required String headerTitle,
     String headerEmoji = '',
+    bool isUnread = true,
     int syncGeneration = 0,
   }) async {
     await syncReceivedMoments(
@@ -22,6 +25,7 @@ class AndroidWidgetBridge {
       preferences: preferences,
       headerTitles: {moment.id: headerTitle},
       headerEmoji: headerEmoji,
+      isUnreadByMomentId: {moment.id: isUnread},
       showLatest: true,
       syncGeneration: syncGeneration,
     );
@@ -33,6 +37,7 @@ class AndroidWidgetBridge {
     required Map<String, String> headerTitles,
     String headerEmoji = '',
     bool showLatest = false,
+    Map<String, bool>? isUnreadByMomentId,
     int syncGeneration = 0,
   }) async {
     if (!Platform.isAndroid || moments.isEmpty) return;
@@ -42,10 +47,11 @@ class AndroidWidgetBridge {
       payload.add({
         'momentId': moment.id,
         'senderId': moment.sender.id,
-        'senderName': headerTitles[moment.id] ?? moment.sender.displayName,
+        'senderName': moment.sender.displayName,
         'caption': moment.caption ?? '',
         'relativeTime': relativeTimeAgo(moment.createdAt),
         'createdAtMillis': moment.createdAt.toUtc().millisecondsSinceEpoch,
+        'isUnread': isUnreadByMomentId?[moment.id] ?? !moment.isSeen,
         if (moment.imageUrl != null) 'imageUrl': moment.imageUrl,
         if (moment.sender.avatarUrl != null) 'avatarUrl': moment.sender.avatarUrl,
       });
@@ -57,6 +63,7 @@ class AndroidWidgetBridge {
       'headerEmoji': headerEmoji,
       'showLatest': showLatest,
       'syncGeneration': syncGeneration,
+      'replaceQueue': true,
     });
   }
 
@@ -69,10 +76,11 @@ class AndroidWidgetBridge {
     await _channel.invokeMethod<void>('pushIncomingMoment', {
       'momentId': moment.id,
       'senderId': moment.sender.id,
-      'senderName': headerTitle,
+      'senderName': moment.sender.displayName,
       'caption': moment.caption ?? '',
       'relativeTime': relativeTimeAgo(moment.createdAt),
       'createdAtMillis': moment.createdAt.toUtc().millisecondsSinceEpoch,
+      'isUnread': true,
       if (moment.imageUrl != null) 'imageUrl': moment.imageUrl,
       if (moment.sender.avatarUrl != null) 'avatarUrl': moment.sender.avatarUrl,
     });
@@ -107,6 +115,7 @@ class AndroidWidgetBridge {
     required Map<String, String> headerTitles,
     String headerEmoji = '',
     bool showLatest = false,
+    Map<String, bool>? isUnreadByMomentId,
     int syncGeneration = 0,
   }) async {
     await syncMoments(
@@ -115,6 +124,7 @@ class AndroidWidgetBridge {
       headerTitles: headerTitles,
       headerEmoji: headerEmoji,
       showLatest: showLatest,
+      isUnreadByMomentId: isUnreadByMomentId,
       syncGeneration: syncGeneration,
     );
   }
@@ -160,6 +170,7 @@ class AndroidWidgetBridge {
         'lock_screen_privacy': raw['lockScreenPrivacy'] as bool? ?? true,
         'paused': raw['paused'] as bool? ?? false,
         'privacy_person_id': _optionalId(raw['privacyPersonId']),
+        'privacy_overrides': _parsePrivacyOverridesJson(raw['privacyOverridesJson']),
         'show_streak': raw['showStreak'] as bool? ?? true,
       });
     } on Object {
@@ -183,12 +194,37 @@ class AndroidWidgetBridge {
       'lockScreenPrivacy': preferences.lockScreenPrivacy,
       'paused': preferences.paused,
       'privacyPersonId': preferences.privacyPersonId ?? '',
+      'privacyOverridesJson': jsonEncode({
+        for (final entry in preferences.privacyOverrides.entries)
+          entry.key: entry.value.name,
+      }),
     };
+  }
+
+  Map<String, String> _parsePrivacyOverridesJson(Object? raw) {
+    if (raw is! String || raw.isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const {};
+      return Map<String, String>.from(
+        decoded.map((key, value) => MapEntry(key.toString(), value.toString())),
+      );
+    } on Object {
+      return const {};
+    }
   }
 
   Future<void> clear() async {
     if (!Platform.isAndroid) return;
     await _channel.invokeMethod<void>('clearWidget');
+  }
+
+  /// Clears unread on the native widget immediately (before full sync).
+  Future<void> markMomentViewedOnDevice(String momentId) async {
+    if (!Platform.isAndroid || momentId.isEmpty) return;
+    await _channel.invokeMethod<void>('markMomentViewed', {
+      'momentId': momentId,
+    });
   }
 
   Future<bool> isPinSupported() async {
@@ -201,5 +237,28 @@ class AndroidWidgetBridge {
     if (!Platform.isAndroid) return false;
     final pinned = await _channel.invokeMethod<bool>('requestPinWidget');
     return pinned ?? false;
+  }
+
+  Future<WidgetBackgroundReliabilityStatus?> getBackgroundReliability() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'getBackgroundReliability',
+      );
+      if (raw == null) return null;
+      return WidgetBackgroundReliabilityStatus.fromMap(raw);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> requestBatteryOptimizationExemption() async {
+    if (!Platform.isAndroid) return;
+    await _channel.invokeMethod<void>('requestBatteryOptimizationExemption');
+  }
+
+  Future<void> openAutostartSettings() async {
+    if (!Platform.isAndroid) return;
+    await _channel.invokeMethod<void>('openAutostartSettings');
   }
 }

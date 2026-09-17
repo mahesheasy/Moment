@@ -84,7 +84,7 @@ async function getAccessToken(account: ServiceAccount): Promise<string> {
 
 Deno.serve(async (request) => {
   try {
-    const { message_id, recipient_id } = await request.json();
+    const { message_id, recipient_id, is_edit } = await request.json();
     if (!message_id || !recipient_id) {
       return new Response(JSON.stringify({ error: "missing ids" }), {
         status: 400,
@@ -140,6 +140,9 @@ Deno.serve(async (request) => {
     const accessToken = await getAccessToken(account);
     const senderName = sender?.display_name ?? "A friend";
     const preview = (message.body as string)?.trim() || "Sent you a chat";
+    const notificationBody = is_edit === true
+      ? `Edited their message: ${preview}`
+      : preview;
 
     let avatarUrl = "";
     if (sender?.avatar_url) {
@@ -157,7 +160,8 @@ Deno.serve(async (request) => {
       senderName,
       avatarUrl,
       notificationTitle: senderName,
-      notificationBody: preview,
+      notificationBody,
+      isEdit: is_edit === true ? "true" : "false",
       createdAt: message.created_at,
       createdAtMillis: String(Date.parse(message.created_at as string) || Date.now()),
     };

@@ -297,6 +297,18 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
     );
   }
 
+  void setPrivacyOverride(String senderId, WidgetPrivacyMode? mode) {
+    _patchPrivacy((draft) {
+      final next = Map<String, WidgetPrivacyMode>.from(draft.privacyOverrides);
+      if (mode == null || mode == draft.privacyMode) {
+        next.remove(senderId);
+      } else {
+        next[senderId] = mode;
+      }
+      return draft.copyWith(privacyOverrides: next);
+    });
+  }
+
   void setShowSender(bool value) {
     _patchPrivacy((draft) => draft.copyWith(showSender: value));
   }
@@ -364,22 +376,20 @@ class WidgetCustomizationCubit extends Cubit<WidgetCustomizationState> {
   }
 
   Future<void> _syncWidgetMoments(WidgetPreferences draft) async {
-    final momentsResult = await _moments.getWidgetMoments(draft);
-    if (momentsResult case Success(:final value) when value.isNotEmpty) {
-      final titles = <String, String>{};
-      for (final moment in value) {
-        final display = await resolveWidgetDisplay(
-          preferences: draft,
-          moment: moment,
-          circles: _circles,
-        );
-        titles[moment.id] = display.headerTitle;
-      }
-      await _widgetBridge.syncReceivedMoments(
-        moments: value,
+    final selectionResult = await _moments.getWidgetDisplayMoment(draft);
+    if (selectionResult case Success(:final value) when value.moment != null) {
+      final moment = value.moment!;
+      final display = await resolveWidgetDisplay(
         preferences: draft,
-        headerTitles: titles,
+        moment: moment,
+        circles: _circles,
+      );
+      await _widgetBridge.syncMoment(
+        moment: moment,
+        preferences: draft,
+        headerTitle: display.headerTitle,
         headerEmoji: draft.theme.emoji,
+        isUnread: value.isUnread,
       );
     }
   }

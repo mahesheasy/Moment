@@ -26,6 +26,12 @@ dependencies:
   flutter_contacts: ^1.1.9+2
   permission_handler: ^11.4.0
   emoji_picker_flutter: ^4.4.0
+  image: ^4.5.4
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.11
+  path_provider: ^2.1.5
 
 dev_dependencies:
   bloc_test: ^10.0.0
@@ -42,10 +48,15 @@ flutter:
   assets:
     - env.json
     - assets/images/empty_moments_polaroid.png
+    - assets/images/widget_empty_moments_night.png
+    - assets/images/widget_empty_moments_morning.png
+    - assets/images/widget_empty_moments_afternoon.jpg
     - assets/images/circles_create_illustration.png
     - assets/images/premium_crown.png
     - assets/images/blocked_empty.png
     - assets/images/notifications_bell.png
+    - assets/images/home_gallery_icon.png
+    - assets/images/home_camera_icon.png
     - assets/images/app_launcher_icon.png
     - assets/images/auth_login_logo.png
     - assets/images/auth_logo_m.png

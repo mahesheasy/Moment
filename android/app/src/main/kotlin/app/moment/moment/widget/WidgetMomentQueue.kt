@@ -15,6 +15,7 @@ data class WidgetMomentEntry(
     val relativeTime: String,
     val imageUrl: String? = null,
     val avatarUrl: String? = null,
+    val isUnread: Boolean = false,
 )
 
 data class UpsertResult(
@@ -30,7 +31,7 @@ object WidgetMomentQueue {
     /** Set when FCM prepends a moment; mergeQueue must jump to front. */
     private const val KEY_RESET_VIEW_TO_FRONT = "widget_reset_view_to_front"
     private const val KEY_LAST_APPLIED_SYNC_GEN = "widget_last_applied_sync_gen"
-    private const val MAX_ENTRIES = 5
+    private const val MAX_ENTRIES = 1
 
     private val queueLock = Any()
 
@@ -63,7 +64,10 @@ object WidgetMomentQueue {
             if (wasDuplicate) {
                 WidgetMomentSyncLog.duplicateMerged(entry.momentId, "upsert")
             }
-            val merged = mergeEntries(listOf(entry), existing)
+            val merged = mergeEntries(
+                listOf(WidgetSeenOnDeviceStore.applySeenState(context, entry)),
+                existing,
+            )
             val prefs =
                 context.getSharedPreferences(MomentWidgetDataStore.PREFS, Context.MODE_PRIVATE)
             val currentIndex =
@@ -131,7 +135,9 @@ object WidgetMomentQueue {
                 return
             }
 
-            val merged = mergeEntries(incoming, existing)
+            val adjustedIncoming =
+                incoming.map { WidgetSeenOnDeviceStore.applySeenState(context, it) }
+            val merged = mergeEntries(adjustedIncoming, existing)
             val prefs =
                 context.getSharedPreferences(MomentWidgetDataStore.PREFS, Context.MODE_PRIVATE)
             val currentIndex =
@@ -216,6 +222,29 @@ object WidgetMomentQueue {
         }
     }
 
+    fun setDisplayMoment(context: Context, entry: WidgetMomentEntry) {
+        synchronized(queueLock) {
+            migrateLegacyMomentIfNeeded(context)
+            saveQueueUnsafe(
+                context,
+                listOf(WidgetSeenOnDeviceStore.applySeenState(context, entry)),
+                selectIndex = 0,
+            )
+        }
+    }
+
+    /** Marks a moment viewed and clears the widget (empty state when caught up). */
+    fun markSeenOnWidget(context: Context, momentId: String) {
+        if (momentId.isBlank()) return
+        WidgetSeenOnDeviceStore.markSeen(context, momentId)
+        MomentWidgetDataStore.clearActiveMoment(context)
+    }
+
+    /** @deprecated Prefer [markSeenOnWidget] — keeps the moment visible as a clear read photo. */
+    fun markViewed(context: Context, momentId: String) {
+        markSeenOnWidget(context, momentId)
+    }
+
     fun loadQueue(context: Context): List<WidgetMomentEntry> {
         synchronized(queueLock) {
             migrateLegacyMomentIfNeeded(context)
@@ -276,7 +305,8 @@ object WidgetMomentQueue {
                     .put("createdAtMillis", entry.createdAtMillis)
                     .put("relativeTime", entry.relativeTime)
                     .put("imageUrl", entry.imageUrl.orEmpty())
-                    .put("avatarUrl", entry.avatarUrl.orEmpty()),
+                    .put("avatarUrl", entry.avatarUrl.orEmpty())
+                    .put("isUnread", entry.isUnread),
             )
         }
         val index = if (trimmed.isEmpty()) 0 else selectIndex.coerceIn(0, trimmed.lastIndex)
@@ -325,6 +355,7 @@ object WidgetMomentQueue {
             .putLong(MomentWidgetDataStore.KEY_CREATED_AT, entry.createdAtMillis)
             .putString(MomentWidgetDataStore.KEY_AVATAR_PATH, entry.avatarPath)
             .putString(MomentWidgetDataStore.KEY_WIDGET_MODE, widgetMode)
+            .putBoolean(MomentWidgetDataStore.KEY_IS_UNREAD, entry.isUnread)
             .commit()
     }
 
@@ -364,6 +395,12 @@ object WidgetMomentQueue {
                 incoming.createdAtMillis > 0L -> incoming.createdAtMillis
                 else -> previous.createdAtMillis
             }
+        val isUnread =
+            when {
+                !previous.isUnread -> false
+                incoming.isUnread -> true
+                else -> false
+            }
         return incoming.copy(
             senderName = incoming.senderName.takeIf { it.isNotBlank() } ?: previous.senderName,
             senderId = incoming.senderId.takeIf { it.isNotBlank() } ?: previous.senderId,
@@ -374,6 +411,7 @@ object WidgetMomentQueue {
             imageUrl = incoming.imageUrl?.takeIf { it.isNotBlank() } ?: previous.imageUrl,
             avatarUrl = incoming.avatarUrl?.takeIf { it.isNotBlank() } ?: previous.avatarUrl,
             createdAtMillis = createdAtMillis,
+            isUnread = isUnread,
         )
     }
 
@@ -397,6 +435,7 @@ object WidgetMomentQueue {
                             relativeTime = obj.optString("relativeTime", ""),
                             imageUrl = obj.optString("imageUrl").ifBlank { null },
                             avatarUrl = obj.optString("avatarUrl").ifBlank { null },
+                            isUnread = obj.optBoolean("isUnread", false),
                         ),
                     )
                 }

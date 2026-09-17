@@ -23,7 +23,7 @@ class NotificationsRemoteDataSource {
       _fetchMomentsReceived(userId),
       _fetchPings(userId),
       _fetchChatMessages(userId),
-      _fetchNewFriends(userId),
+      _fetchAcceptedFriendRequests(userId),
     ]);
 
     final feed = results.expand((items) => items).toList()
@@ -47,26 +47,43 @@ class NotificationsRemoteDataSource {
         });
       }
 
-      final subscriptions = <StreamSubscription<dynamic>>[
+      final subscriptions = <StreamSubscription<dynamic>>[];
+
+      void listenSafe(Stream<dynamic> stream) {
+        subscriptions.add(
+          stream.listen((_) => emit(), onError: (_, _) {}),
+        );
+      }
+      listenSafe(
         _client
             .from('moment_recipients')
             .stream(primaryKey: ['moment_id', 'recipient_id'])
-            .eq('recipient_id', userId)
-            .listen((_) => emit()),
+            .eq('recipient_id', userId),
+      );
+      listenSafe(
         _client
             .from('moment_reactions')
-            .stream(primaryKey: ['moment_id', 'user_id'])
-            .listen((_) => emit()),
+            .stream(primaryKey: ['moment_id', 'user_id']),
+      );
+      listenSafe(
         _client
             .from('pings')
             .stream(primaryKey: ['id'])
-            .eq('recipient_id', userId)
-            .listen((_) => emit()),
+            .eq('recipient_id', userId),
+      );
+      listenSafe(_client.from('chat_messages').stream(primaryKey: ['id']));
+      listenSafe(
         _client
-            .from('chat_messages')
+            .from('friend_requests')
             .stream(primaryKey: ['id'])
-            .listen((_) => emit()),
-      ];
+            .eq('receiver_id', userId),
+      );
+      listenSafe(
+        _client
+            .from('friend_requests')
+            .stream(primaryKey: ['id'])
+            .eq('sender_id', userId),
+      );
 
       pollTimer = Timer.periodic(const Duration(seconds: 45), (_) => emit());
 
@@ -254,37 +271,41 @@ class NotificationsRemoteDataSource {
     }).toList();
   }
 
-  Future<List<AppNotification>> _fetchNewFriends(String userId) async {
+  Future<List<AppNotification>> _fetchAcceptedFriendRequests(
+    String userId,
+  ) async {
     final since = DateTime.now()
         .subtract(const Duration(days: _friendWindowDays))
         .toUtc()
         .toIso8601String();
 
     final data = await _client
-        .from('friendships')
-        .select('created_at, friend:friend_id(*)')
-        .eq('user_id', userId)
-        .gte('created_at', since)
-        .order('created_at', ascending: false)
+        .from('friend_requests')
+        .select('id, updated_at, receiver:receiver_id(*)')
+        .eq('sender_id', userId)
+        .eq('status', 'accepted')
+        .gte('updated_at', since)
+        .order('updated_at', ascending: false)
         .limit(10);
 
     return (data as List).map((row) {
       final map = Map<String, dynamic>.from(row as Map);
-      final friend = ProfileModel.fromJson(
-        Map<String, dynamic>.from(map['friend'] as Map),
+      final accepter = ProfileModel.fromJson(
+        Map<String, dynamic>.from(map['receiver'] as Map),
       ).toEntity();
-      final createdAt = DateTime.parse(map['created_at'] as String).toUtc();
+      final requestId = map['id'] as String;
+      final acceptedAt = DateTime.parse(map['updated_at'] as String).toUtc();
 
       return AppNotification(
-        id: 'friend_joined_${friend.id}_${createdAt.millisecondsSinceEpoch}',
+        id: 'friend_accepted_$requestId',
         type: AppNotificationType.friendJoined,
-        title: friend.displayName,
-        body: 'is now your friend on Moment.',
-        createdAt: createdAt,
+        title: accepter.displayName,
+        body: 'accepted your friend request. Send them your first moment!',
+        createdAt: acceptedAt,
         isUnread: true,
-        target: FriendNotificationTarget(friend.id),
-        avatarName: friend.displayName,
-        avatarUrl: friend.avatarUrl,
+        target: FriendNotificationTarget(accepter.id),
+        avatarName: accepter.displayName,
+        avatarUrl: accepter.avatarUrl,
       );
     }).toList();
   }

@@ -5,6 +5,7 @@ import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/app/router/go_router_refresh.dart';
 import 'package:moment/app/shell/main_shell.dart';
 import 'package:moment/features/friends/presentation/pages/friend_profile_page.dart';
+import 'package:moment/features/friends/presentation/pages/friend_qr_scan_page.dart';
 import 'package:moment/features/friends/presentation/pages/friends_page.dart';
 import 'package:moment/features/auth/presentation/pages/login_page.dart';
 import 'package:moment/features/auth/presentation/pages/permissions_setup_page.dart';
@@ -31,7 +32,9 @@ import 'package:moment/features/widget_preferences/presentation/pages/widget_set
 import 'package:moment/features/profile/presentation/pages/profile_page.dart';
 import 'package:moment/features/settings/presentation/pages/appearance_settings_page.dart';
 import 'package:moment/features/settings/presentation/pages/blocked_users_page.dart';
+import 'package:moment/features/settings/domain/legal_documents.dart';
 import 'package:moment/features/settings/presentation/pages/help_page.dart';
+import 'package:moment/features/settings/presentation/pages/legal_document_page.dart';
 import 'package:moment/features/settings/presentation/pages/notification_settings_page.dart';
 import 'package:moment/features/settings/presentation/pages/notifications_page.dart';
 import 'package:moment/features/settings/presentation/pages/report_problem_page.dart';
@@ -53,7 +56,9 @@ GoRouter createAppRouter({
     return location == AppRoutes.splash ||
         location == AppRoutes.onboarding ||
         location == AppRoutes.login ||
-        location == AppRoutes.register;
+        location == AppRoutes.register ||
+        location == AppRoutes.termsOfService ||
+        location == AppRoutes.privacyPolicy;
   }
 
   return GoRouter(
@@ -123,6 +128,17 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => const RegisterPage(),
+      ),
+      // Auth legal docs — reachable from login, register, and settings.
+      GoRoute(
+        path: AppRoutes.termsOfService,
+        builder: (context, state) =>
+            const LegalDocumentPage(type: LegalDocumentType.terms),
+      ),
+      GoRoute(
+        path: AppRoutes.privacyPolicy,
+        builder: (context, state) =>
+            const LegalDocumentPage(type: LegalDocumentType.privacy),
       ),
       GoRoute(
         path: AppRoutes.camera,
@@ -199,6 +215,11 @@ GoRouter createAppRouter({
         path: AppRoutes.friends,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const FriendsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.friendsScan,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const FriendQrScanPage(),
       ),
       GoRoute(
         path: '/chat/:userId',

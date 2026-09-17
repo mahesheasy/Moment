@@ -14,25 +14,9 @@ class MomentWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MomentGlanceWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
-        val appContext = context.applicationContext
-        when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED -> {
-                WidgetTimeRefresh.schedule(appContext)
-                WidgetSyncScheduler.schedulePeriodic(appContext)
-            }
-            Intent.ACTION_SCREEN_OFF -> {
-                WidgetMediaPrivacyPreview.protectImmediately(appContext)
-                widgetScope.launch { MomentWidgetUpdater.updatePreservingView(appContext) }
-                return
-            }
-            Intent.ACTION_SCREEN_ON -> {
-                val data = MomentWidgetDataStore.load(appContext)
-                if (data.hasMoment && data.momentId.isNotBlank()) {
-                    WidgetMediaPrivacyPreview.beginSession(appContext, data.momentId)
-                }
-                widgetScope.launch { MomentWidgetUpdater.updatePreservingView(appContext) }
-                return
-            }
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            WidgetTimeRefresh.schedule(context.applicationContext)
+            WidgetSyncScheduler.schedulePeriodic(context.applicationContext)
         }
         super.onReceive(context, intent)
     }
@@ -51,7 +35,6 @@ class MomentWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDisabled(context: Context) {
         WidgetTimeRefresh.cancel(context.applicationContext)
-        WidgetMediaPrivacyPreview.cancelSession(context.applicationContext)
         super.onDisabled(context)
     }
 

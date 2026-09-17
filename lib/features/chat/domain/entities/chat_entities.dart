@@ -122,6 +122,12 @@ class ChatMessage extends Equatable {
 
   bool get isRead => readAt != null;
 
+  bool get canEdit =>
+      isMine &&
+      messageType == ChatMessageType.text &&
+      !deletedForEveryone &&
+      !isRead;
+
   String? reactionEmojiFor(String userId) {
     for (final reaction in reactions) {
       if (reaction.userId == userId) return reaction.emoji;

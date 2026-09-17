@@ -5,6 +5,7 @@ import 'package:moment/features/chat/presentation/theme/moment_space_theme.dart'
 import 'package:moment/features/friends/presentation/theme/friend_profile_theme.dart';
 import 'package:moment/features/friends/presentation/theme/friend_profile_typography.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
+import 'package:moment/features/profile/domain/presence_utils.dart';
 
 class FriendProfileHero extends StatelessWidget {
   const FriendProfileHero({
@@ -28,9 +29,9 @@ class FriendProfileHero extends StatelessWidget {
           children: [
             _ProfileAvatarRing(profile: profile),
             if (showOnlineStatus)
-              const Positioned(
+              Positioned(
                 bottom: -2,
-                child: _OnlineStatusPill(),
+                child: _OnlineStatusPill(profile: profile),
               ),
           ],
         ),
@@ -101,10 +102,18 @@ class _ProfileAvatarRing extends StatelessWidget {
 }
 
 class _OnlineStatusPill extends StatelessWidget {
-  const _OnlineStatusPill();
+  const _OnlineStatusPill({required this.profile});
+
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
+    final isOnline = PresenceUtils.isOnline(profile.lastSeenAt);
+    final label = PresenceUtils.statusLabel(
+      isTyping: false,
+      lastSeenAt: profile.lastSeenAt,
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -118,13 +127,15 @@ class _OnlineStatusPill extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(
-              color: MomentSpaceTheme.onlineGreen,
+            decoration: BoxDecoration(
+              color: isOnline
+                  ? MomentSpaceTheme.onlineGreen
+                  : Colors.white.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 6),
-          const Text('Online', style: FriendProfileTextStyles.onlineStatus),
+          Text(label, style: FriendProfileTextStyles.onlineStatus),
         ],
       ),
     );

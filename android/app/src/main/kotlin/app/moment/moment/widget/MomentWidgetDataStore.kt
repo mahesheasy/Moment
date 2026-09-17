@@ -29,6 +29,7 @@ data class MomentWidgetData(
     val showStreak: Boolean = true,
     val streakCount: Int = 0,
     val renderSeq: Long = 0L,
+    val isUnread: Boolean = false,
 )
 
 object MomentWidgetDataStore {
@@ -59,9 +60,8 @@ object MomentWidgetDataStore {
     const val KEY_HAS_CUSTOMIZATION = "has_customization"
     const val KEY_SHOW_STREAK = "show_streak"
     const val KEY_STREAK_COUNT = "streak_count"
-    const val KEY_PREVIEW_STARTED_AT = "preview_started_at"
-    const val KEY_PREVIEW_MOMENT_ID = "preview_moment_id"
     const val KEY_RENDER_SEQ = "widget_render_seq"
+    const val KEY_IS_UNREAD = "widget_moment_is_unread"
 
     fun save(
         context: Context,
@@ -109,6 +109,7 @@ object MomentWidgetDataStore {
         lockScreenPrivacy: Boolean?,
         paused: Boolean?,
         privacyPersonId: String? = null,
+        privacyOverridesJson: String? = null,
         showStreak: Boolean? = null,
         streakCount: Int? = null,
     ) {
@@ -140,28 +141,30 @@ object MomentWidgetDataStore {
             privacyPersonId.isNullOrBlank() -> editor.remove(KEY_PRIVACY_PERSON)
             privacyPersonId != null -> editor.putString(KEY_PRIVACY_PERSON, privacyPersonId)
         }
+        if (privacyOverridesJson != null) {
+            editor.putString(
+                WidgetPrivacyOverridesStore.KEY_PRIVACY_OVERRIDES,
+                privacyOverridesJson,
+            )
+        }
         editor.putBoolean(KEY_HAS_CUSTOMIZATION, true)
         editor.commit()
     }
 
     fun clear(context: Context) {
+        clearActiveMoment(context)
+    }
+
+    /** Clears the visible moment but keeps widget customization prefs. */
+    fun clearActiveMoment(context: Context) {
         WidgetMomentQueue.clear(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val theme = prefs.getString(KEY_THEME, "minimal")
-        val accent = prefs.getString(KEY_ACCENT, "#FF6B8A")
-        val typography = prefs.getString(KEY_TYPOGRAPHY, "default")
-        val displaySize = prefs.getString(KEY_DISPLAY_SIZE, "small")
-        val widgetMode = prefs.getString(KEY_WIDGET_MODE, "latest")
-        val privacyMode = prefs.getString(KEY_PRIVACY_MODE, "full")
-        val showSender = prefs.getBoolean(KEY_SHOW_SENDER, true)
-        val showTimestamp = prefs.getBoolean(KEY_SHOW_TIMESTAMP, true)
-        val showCaptions = prefs.getBoolean(KEY_SHOW_CAPTIONS, false)
-        val lockScreen = prefs.getBoolean(KEY_LOCK_SCREEN, true)
-        val paused = prefs.getBoolean(KEY_PAUSED, false)
+        val nextRenderSeq = prefs.getLong(KEY_RENDER_SEQ, 0L) + 1L
         prefs
             .edit()
             .putBoolean(KEY_HAS_MOMENT, false)
             .remove(KEY_SENDER)
+            .remove(KEY_SENDER_ID)
             .remove(KEY_MOMENT_ID)
             .remove(KEY_IMAGE_PATH)
             .remove(KEY_CAPTION)
@@ -169,17 +172,8 @@ object MomentWidgetDataStore {
             .remove(KEY_CREATED_AT)
             .remove(KEY_HEADER_EMOJI)
             .remove(KEY_AVATAR_PATH)
-            .putString(KEY_THEME, theme)
-            .putString(KEY_ACCENT, accent)
-            .putString(KEY_TYPOGRAPHY, typography)
-            .putString(KEY_DISPLAY_SIZE, displaySize)
-            .putString(KEY_WIDGET_MODE, widgetMode)
-            .putString(KEY_PRIVACY_MODE, privacyMode)
-            .putBoolean(KEY_SHOW_SENDER, showSender)
-            .putBoolean(KEY_SHOW_TIMESTAMP, showTimestamp)
-            .putBoolean(KEY_SHOW_CAPTIONS, showCaptions)
-            .putBoolean(KEY_LOCK_SCREEN, lockScreen)
-            .putBoolean(KEY_PAUSED, paused)
+            .putBoolean(KEY_IS_UNREAD, false)
+            .putLong(KEY_RENDER_SEQ, nextRenderSeq)
             .commit()
     }
 
@@ -232,6 +226,7 @@ object MomentWidgetDataStore {
             showStreak = prefs.getBoolean(KEY_SHOW_STREAK, true),
             streakCount = prefs.getInt(KEY_STREAK_COUNT, 0),
             renderSeq = prefs.getLong(KEY_RENDER_SEQ, 0L),
+            isUnread = active?.isUnread ?: prefs.getBoolean(KEY_IS_UNREAD, false),
         )
     }
 }

@@ -24,6 +24,9 @@ class FriendsState extends Equatable {
     this.searchResults = const [],
     this.searchQuery = '',
     this.myUsername,
+    this.myUserId,
+    this.myDisplayName,
+    this.myAvatarUrl,
     this.actingOn,
     this.errorMessage,
     this.actionMessage,
@@ -40,6 +43,9 @@ class FriendsState extends Equatable {
   final List<UserSearchResult> searchResults;
   final String searchQuery;
   final String? myUsername;
+  final String? myUserId;
+  final String? myDisplayName;
+  final String? myAvatarUrl;
   final String? actingOn;
   final String? errorMessage;
   final String? actionMessage;
@@ -60,6 +66,9 @@ class FriendsState extends Equatable {
     List<UserSearchResult>? searchResults,
     String? searchQuery,
     String? myUsername,
+    String? myUserId,
+    String? myDisplayName,
+    String? myAvatarUrl,
     String? actingOn,
     String? errorMessage,
     String? actionMessage,
@@ -80,6 +89,9 @@ class FriendsState extends Equatable {
       searchResults: searchResults ?? this.searchResults,
       searchQuery: searchQuery ?? this.searchQuery,
       myUsername: myUsername ?? this.myUsername,
+      myUserId: myUserId ?? this.myUserId,
+      myDisplayName: myDisplayName ?? this.myDisplayName,
+      myAvatarUrl: myAvatarUrl ?? this.myAvatarUrl,
       actingOn: clearActing ? null : actingOn ?? this.actingOn,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       actionMessage: clearActionMessage
@@ -101,6 +113,9 @@ class FriendsState extends Equatable {
     searchResults,
     searchQuery,
     myUsername,
+    myUserId,
+    myDisplayName,
+    myAvatarUrl,
     actingOn,
     errorMessage,
     actionMessage,
@@ -210,6 +225,11 @@ class FriendsCubit extends Cubit<FriendsState> {
   }
 
   Future<void> acceptRequest(String requestId) async {
+    final request = state.incoming
+        .where((item) => item.id == requestId)
+        .firstOrNull;
+    final name = request?.sender.displayName ?? 'them';
+
     emit(
       state.copyWith(
         status: FriendsStatus.acting,
@@ -222,7 +242,14 @@ class FriendsCubit extends Cubit<FriendsState> {
     switch (result) {
       case Success():
         await _refreshAll(showLoading: false);
-        emit(state.copyWith(clearActing: true, clearError: true));
+        emit(
+          state.copyWith(
+            clearActing: true,
+            clearError: true,
+            actionMessage:
+                'You and $name are now friends. Send them your first moment!',
+          ),
+        );
       case Failed(:final failure):
         emit(
           state.copyWith(
@@ -399,9 +426,17 @@ class FriendsCubit extends Cubit<FriendsState> {
     var outgoing = state.outgoing;
     var suggestions = state.suggestions;
     var myUsername = state.myUsername;
+    var myUserId = state.myUserId;
+    var myDisplayName = state.myDisplayName;
+    var myAvatarUrl = state.myAvatarUrl;
 
     profileResult.when(
-      success: (profile) => myUsername = profile.username,
+      success: (profile) {
+        myUsername = profile.username;
+        myUserId = profile.id;
+        myDisplayName = profile.displayName;
+        myAvatarUrl = profile.avatarUrl;
+      },
       failure: (_) {},
     );
 
@@ -440,6 +475,9 @@ class FriendsCubit extends Cubit<FriendsState> {
         outgoing: outgoing,
         suggestions: suggestions,
         myUsername: myUsername,
+        myUserId: myUserId,
+        myDisplayName: myDisplayName,
+        myAvatarUrl: myAvatarUrl,
         clearActing: true,
         clearError: true,
       ),

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moment/core/result/result.dart';
@@ -7,6 +10,7 @@ import 'package:moment/features/circles/domain/entities/circle.dart';
 import 'package:moment/features/circles/domain/repositories/circle_repository.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/friends/domain/repositories/friends_repository.dart';
+import 'package:moment/features/moments/data/moment_context_service.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/moments/domain/entities/reaction.dart';
 import 'package:moment/features/moments/domain/repositories/moment_repository.dart';
@@ -18,7 +22,6 @@ import 'package:moment/features/prompts/domain/repositories/prompt_repository.da
 import 'package:moment/features/widget_preferences/domain/entities/widget_preferences.dart';
 import 'package:moment/features/widget_preferences/domain/repositories/widget_preferences_repository.dart';
 import 'package:uuid/uuid.dart';
-import 'dart:typed_data';
 
 enum HomeStatus { initial, loading, loaded, empty, failure }
 
@@ -203,7 +206,8 @@ class HomeCubit extends Cubit<HomeState> {
   }
 
   Future<void> markViewed(String momentId) async {
-    await _moments.markSeen(momentId);
+    await _widgetSync.onMomentViewed(momentId);
+    unawaited(_moments.markSeen(momentId));
     if (isClosed) return;
 
     final remaining = state.storyMoments
@@ -330,6 +334,18 @@ class CameraState extends Equatable {
     this.promptId,
     this.promptCircleId,
     this.sentMomentId,
+    this.reviewRating = 0,
+    this.reviewText = '',
+    this.decorations = const {},
+    this.locationLabel,
+    this.weatherLabel,
+    this.timeLabel,
+    this.includeLocation = false,
+    this.includeWeather = false,
+    this.includeTime = false,
+    this.includeStreak = false,
+    this.streakCount = 0,
+    this.isLoadingContext = false,
   });
 
   final CameraStatus status;
@@ -352,6 +368,28 @@ class CameraState extends Equatable {
   final String? promptId;
   final String? promptCircleId;
   final String? sentMomentId;
+  final int reviewRating;
+  final String reviewText;
+  final Set<String> decorations;
+  final String? locationLabel;
+  final String? weatherLabel;
+  final String? timeLabel;
+  final bool includeLocation;
+  final bool includeWeather;
+  final bool includeTime;
+  final bool includeStreak;
+  final int streakCount;
+  final bool isLoadingContext;
+
+  bool get isAllSelected {
+    if (friends.isEmpty && circles.isEmpty) return false;
+    final friendIds = friends.map((f) => f.profile.id).toSet();
+    final circleIds = circles.map((c) => c.id).toSet();
+    return selectedRecipientIds.containsAll(friendIds) &&
+        selectedCircleIds.containsAll(circleIds) &&
+        selectedRecipientIds.length == friendIds.length &&
+        selectedCircleIds.length == circleIds.length;
+  }
 
   bool get isPromptMode =>
       promptId != null && promptCircleId != null && promptId!.isNotEmpty;
@@ -424,6 +462,18 @@ class CameraState extends Equatable {
     String? promptId,
     String? promptCircleId,
     String? sentMomentId,
+    int? reviewRating,
+    String? reviewText,
+    Set<String>? decorations,
+    String? locationLabel,
+    String? weatherLabel,
+    String? timeLabel,
+    bool? includeLocation,
+    bool? includeWeather,
+    bool? includeTime,
+    bool? includeStreak,
+    int? streakCount,
+    bool? isLoadingContext,
   }) {
     return CameraState(
       status: status ?? this.status,
@@ -446,7 +496,58 @@ class CameraState extends Equatable {
       promptId: promptId ?? this.promptId,
       promptCircleId: promptCircleId ?? this.promptCircleId,
       sentMomentId: sentMomentId ?? this.sentMomentId,
+      reviewRating: reviewRating ?? this.reviewRating,
+      reviewText: reviewText ?? this.reviewText,
+      decorations: decorations ?? this.decorations,
+      locationLabel: locationLabel ?? this.locationLabel,
+      weatherLabel: weatherLabel ?? this.weatherLabel,
+      timeLabel: timeLabel ?? this.timeLabel,
+      includeLocation: includeLocation ?? this.includeLocation,
+      includeWeather: includeWeather ?? this.includeWeather,
+      includeTime: includeTime ?? this.includeTime,
+      includeStreak: includeStreak ?? this.includeStreak,
+      streakCount: streakCount ?? this.streakCount,
+      isLoadingContext: isLoadingContext ?? this.isLoadingContext,
     );
+  }
+
+  String get composedCaption {
+    final parts = <String>[];
+    final trimmedCaption = caption.trim();
+    if (trimmedCaption.isNotEmpty) parts.add(trimmedCaption);
+
+    final trimmedReview = reviewText.trim();
+    if (reviewRating > 0 || trimmedReview.isNotEmpty) {
+      final stars = reviewRating > 0 ? '${'★' * reviewRating}${'☆' * (5 - reviewRating)}' : '';
+      if (trimmedReview.isNotEmpty && stars.isNotEmpty) {
+        parts.add('$stars · $trimmedReview');
+      } else if (trimmedReview.isNotEmpty) {
+        parts.add(trimmedReview);
+      } else {
+        parts.add(stars);
+      }
+    }
+
+    if (includeLocation && locationLabel != null && locationLabel!.isNotEmpty) {
+      parts.add('📍 $locationLabel');
+    }
+    if (includeWeather && weatherLabel != null && weatherLabel!.isNotEmpty) {
+      parts.add('🌤 $weatherLabel');
+    }
+    if (includeTime && timeLabel != null && timeLabel!.isNotEmpty) {
+      parts.add('🕐 $timeLabel');
+    }
+    if (includeStreak && streakCount > 0) {
+      parts.add('🔥 $streakCount');
+    }
+
+    for (final tag in decorations) {
+      parts.add('#$tag');
+    }
+
+    final composed = parts.join('\n');
+    if (composed.length <= 280) return composed;
+    return composed.substring(0, 277).trimRight() + '...';
   }
 
   @override
@@ -471,6 +572,18 @@ class CameraState extends Equatable {
     promptId,
     promptCircleId,
     sentMomentId,
+    reviewRating,
+    reviewText,
+    decorations,
+    locationLabel,
+    weatherLabel,
+    timeLabel,
+    includeLocation,
+    includeWeather,
+    includeTime,
+    includeStreak,
+    streakCount,
+    isLoadingContext,
   ];
 }
 
@@ -491,6 +604,7 @@ class CameraCubit extends Cubit<CameraState> {
   final CircleRepository _circles;
   final String? Function() _userIdProvider;
   final CameraPromptContext? _promptContext;
+  final MomentContextService _contextService = MomentContextService();
 
   Future<void> initialize() async {
     final promptContext = _promptContext;
@@ -590,6 +704,90 @@ class CameraCubit extends Cubit<CameraState> {
     emit(state.copyWith(caption: caption));
   }
 
+  void setReviewRating(int rating) {
+    emit(state.copyWith(reviewRating: rating.clamp(0, 5)));
+  }
+
+  void setReviewText(String text) {
+    emit(state.copyWith(reviewText: text));
+  }
+
+  void toggleDecoration(String tag) {
+    final next = Set<String>.from(state.decorations);
+    if (next.contains(tag)) {
+      next.remove(tag);
+    } else {
+      next.add(tag);
+    }
+    emit(state.copyWith(decorations: next));
+  }
+
+  void toggleIncludeLocation() {
+    emit(state.copyWith(includeLocation: !state.includeLocation));
+  }
+
+  void toggleIncludeWeather() {
+    emit(state.copyWith(includeWeather: !state.includeWeather));
+  }
+
+  void toggleIncludeTime() {
+    emit(state.copyWith(includeTime: !state.includeTime));
+  }
+
+  void toggleIncludeStreak() {
+    emit(state.copyWith(includeStreak: !state.includeStreak));
+  }
+
+  void selectAllRecipients() {
+    final friendIds = state.friends.map((f) => f.profile.id).toSet();
+    final circleIds = state.circles.map((c) => c.id).toSet();
+    emit(
+      state.copyWith(
+        selectedRecipientIds: friendIds,
+        selectedCircleIds: circleIds,
+        errorMessage: null,
+      ),
+    );
+  }
+
+  void selectOnlyRecipient(String id) {
+    emit(
+      state.copyWith(
+        selectedRecipientIds: {id},
+        selectedCircleIds: const {},
+        errorMessage: null,
+      ),
+    );
+  }
+
+  void selectOnlyCircle(String id) {
+    emit(
+      state.copyWith(
+        selectedRecipientIds: const {},
+        selectedCircleIds: {id},
+        errorMessage: null,
+      ),
+    );
+  }
+
+  Future<void> loadMomentContext() async {
+    emit(state.copyWith(isLoadingContext: true));
+    final snapshot = await _contextService.load();
+    final streakCount = switch (await _moments.getMomentStreak()) {
+      Success(:final value) => value,
+      Failed() => 0,
+    };
+    emit(
+      state.copyWith(
+        isLoadingContext: false,
+        locationLabel: snapshot.locationLabel,
+        weatherLabel: snapshot.weatherLabel,
+        timeLabel: snapshot.timeLabel,
+        streakCount: streakCount,
+      ),
+    );
+  }
+
   void setSearchQuery(String query) {
     emit(state.copyWith(searchQuery: query));
   }
@@ -659,7 +857,7 @@ class CameraCubit extends Cubit<CameraState> {
         imageBytes: bytes,
         mimeType: mimeType,
         recipientIds: recipientIds.toList(),
-        caption: state.caption,
+        caption: state.composedCaption.isEmpty ? null : state.composedCaption,
         idempotencyKey: state.idempotencyKey,
       ),
     );
@@ -768,17 +966,26 @@ class MomentDetailState extends Equatable {
 }
 
 class MomentDetailCubit extends Cubit<MomentDetailState> {
-  MomentDetailCubit(this._moments, this._social, this._momentId)
-    : super(const MomentDetailState());
+  MomentDetailCubit(
+    this._moments,
+    this._social,
+    this._widgetSync,
+    this._momentId,
+  ) : super(const MomentDetailState());
 
   final MomentRepository _moments;
   final SocialRepository _social;
+  final HomeWidgetSyncService _widgetSync;
   final String _momentId;
 
   Future<void> load() async {
     emit(
       state.copyWith(status: MomentDetailStatus.loading, clearMessages: true),
     );
+
+    // User opened this moment — advance widget even if server already has seen_at.
+    await _widgetSync.onMomentViewed(_momentId);
+
     final result = await _moments.getMoment(_momentId);
     switch (result) {
       case Success(:final value):
@@ -791,7 +998,7 @@ class MomentDetailCubit extends Cubit<MomentDetailState> {
           ),
         );
         if (!value.isSeen) {
-          await _moments.markSeen(_momentId);
+          unawaited(_moments.markSeen(_momentId));
         }
       case Failed(:final failure):
         emit(

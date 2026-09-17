@@ -23,8 +23,12 @@ object WidgetFcmParser {
         }
 
         val senderName =
-            data.fcm("headerTitle").ifBlank {
-                data.fcm("title").ifBlank { data.fcm("senderName") }
+            data.fcm("senderName").ifBlank {
+                data.fcm("notificationTitle").ifBlank {
+                    data.fcm("headerTitle").ifBlank {
+                        data.fcm("title").ifBlank { data.fcm("sender_name") }
+                    }
+                }
             }
 
         return WidgetMomentEntry(
@@ -45,6 +49,7 @@ object WidgetFcmParser {
                 },
             imageUrl = data.fcm("imageUrl").ifBlank { data.fcm("image_url") }.ifBlank { null },
             avatarUrl = data.fcm("avatarUrl").ifBlank { data.fcm("avatar_url") }.ifBlank { null },
+            isUnread = true,
         )
     }
 

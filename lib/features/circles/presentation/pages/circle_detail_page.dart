@@ -101,9 +101,7 @@ class _CircleDetailView extends StatelessWidget {
     final state = cubit.state;
     if (state.friends.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Add friends first, then invite them here.'),
-        ),
+        SnackBar(content: Text('Add friends first, then invite them here.')),
       );
       await context.push(AppRoutes.friends);
       if (context.mounted) await cubit.load();
@@ -112,9 +110,7 @@ class _CircleDetailView extends StatelessWidget {
 
     if (state.members.length >= CircleLimits.maxMembers) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('A circle can have at most 20 members.'),
-        ),
+        SnackBar(content: Text('A circle can have at most 20 members.')),
       );
       return;
     }
@@ -245,8 +241,7 @@ class _CircleDetailView extends StatelessWidget {
               ListTile(
                 leading: Icon(Icons.photo_library_outlined),
                 title: Text('Choose from gallery'),
-                onTap: () =>
-                    Navigator.pop(sheetContext, ImageSource.gallery),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
               ),
               ListTile(
                 leading: Icon(Icons.photo_camera_outlined),
@@ -324,9 +319,7 @@ class _CircleDetailView extends StatelessWidget {
       builder: (context, state) {
         final circle = state.circle;
         if (state.status == CircleDetailStatus.loading && circle == null) {
-          return Scaffold(
-            body: Center(child: MomentLoading()),
-          );
+          return Scaffold(body: Center(child: MomentLoading()));
         }
         if (state.status == CircleDetailStatus.failure && circle == null) {
           return Scaffold(
@@ -339,9 +332,7 @@ class _CircleDetailView extends StatelessWidget {
           );
         }
         if (circle == null) {
-          return Scaffold(
-            body: Center(child: MomentLoading()),
-          );
+          return Scaffold(body: Center(child: MomentLoading()));
         }
 
         final latest = state.latestMoment;
@@ -403,25 +394,25 @@ class _CircleDetailView extends StatelessWidget {
                       'Latest moment',
                       style: SettingsType.title(Colors.white),
                     ),
-                    Spacer(),
-                    if (state.moments.isNotEmpty)
-                      GestureDetector(
-                        onTap: () =>
-                            context.push(AppRoutes.circleMoments(circleId)),
-                        child: Row(
-                          children: [
-                            Text(
-                              'See all',
-                              style: SettingsType.caption(AppColors.violet),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              size: 14,
-                              color: AppColors.violet,
-                            ),
-                          ],
-                        ),
-                      ),
+                    // Spacer(),
+                    // if (state.moments.isNotEmpty)
+                    //   GestureDetector(
+                    //     onTap: () =>
+                    //         context.push(AppRoutes.circleMoments(circleId)),
+                    //     child: Row(
+                    //       children: [
+                    //         Text(
+                    //           'See all',
+                    //           style: SettingsType.caption(AppColors.violet),
+                    //         ),
+                    //         Icon(
+                    //           Icons.chevron_right_rounded,
+                    //           size: 14,
+                    //           color: AppColors.violet,
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
                   ],
                 ),
                 SizedBox(height: 10),
@@ -440,9 +431,9 @@ class _CircleDetailView extends StatelessWidget {
                       : () async {
                           final type = await ReactionPickerSheet.show(context);
                           if (type != null && context.mounted) {
-                            await context.read<CircleDetailCubit>().reactToLatest(
-                              type,
-                            );
+                            await context
+                                .read<CircleDetailCubit>()
+                                .reactToLatest(type);
                           }
                         },
                   onPing: latest == null || latest.sender.id == me
@@ -502,6 +493,7 @@ class _CircleDetailView extends StatelessWidget {
     );
   }
 }
+
 class _CircleHeader extends StatelessWidget {
   const _CircleHeader({
     required this.circle,
@@ -581,10 +573,9 @@ class _CircleHeader extends StatelessWidget {
                           circle.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: SettingsType.title(Colors.white).copyWith(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: SettingsType.title(
+                            Colors.white,
+                          ).copyWith(fontSize: 16, fontWeight: FontWeight.w700),
                         ),
                       ),
                       if (onRename != null) ...[
@@ -615,7 +606,9 @@ class _CircleHeader extends StatelessWidget {
                       Icon(
                         Icons.lock_outline_rounded,
                         size: 11,
-                        color: AppColors.textTertiaryDark.withValues(alpha: 0.9),
+                        color: AppColors.textTertiaryDark.withValues(
+                          alpha: 0.9,
+                        ),
                       ),
                       SizedBox(width: 4),
                       Text(
@@ -628,9 +621,9 @@ class _CircleHeader extends StatelessWidget {
                     SizedBox(height: 2),
                     Text(
                       'You manage this circle',
-                      style: SettingsType.caption(AppColors.violet).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: SettingsType.caption(
+                        AppColors.violet,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                   ],
                 ],
@@ -663,9 +656,9 @@ class _CircleHeader extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             'Invite',
-                            style: SettingsType.caption(Colors.white).copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: SettingsType.caption(
+                              Colors.white,
+                            ).copyWith(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -676,55 +669,57 @@ class _CircleHeader extends StatelessWidget {
           ],
         ),
         SizedBox(height: 12),
-        ...members.take(3).map(
-          (member) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: GestureDetector(
-              onTap: onMembers,
-              behavior: HitTestBehavior.opaque,
-              child: Row(
-                children: [
-                  MomentAvatar(
-                    name: member.profile.displayName,
-                    imageUrl: member.profile.avatarUrl,
-                    size: 28,
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _memberLabel(member, currentUserId),
-                      style: SettingsType.body(Colors.white).copyWith(
-                        fontWeight: FontWeight.w500,
+        ...members
+            .take(3)
+            .map(
+              (member) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: GestureDetector(
+                  onTap: onMembers,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      MomentAvatar(
+                        name: member.profile.displayName,
+                        imageUrl: member.profile.avatarUrl,
+                        size: 28,
                       ),
-                    ),
-                  ),
-                  if (member.isOwner)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceElevatedDark,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        'Admin',
-                        style: SettingsType.caption(
-                          AppColors.textSecondaryDark,
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _memberLabel(member, currentUserId),
+                          style: SettingsType.body(
+                            Colors.white,
+                          ).copyWith(fontWeight: FontWeight.w500),
                         ),
                       ),
-                    ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: AppColors.textTertiaryDark,
+                      if (member.isOwner)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceElevatedDark,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Admin',
+                            style: SettingsType.caption(
+                              AppColors.textSecondaryDark,
+                            ),
+                          ),
+                        ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: AppColors.textTertiaryDark,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
       ],
     );
   }
@@ -737,6 +732,7 @@ class _CircleHeader extends StatelessWidget {
     return name;
   }
 }
+
 class _CircleOptionTile extends StatelessWidget {
   const _CircleOptionTile({
     required this.icon,
@@ -768,6 +764,7 @@ class _CircleOptionTile extends StatelessWidget {
     );
   }
 }
+
 class _LatestMomentCard extends StatelessWidget {
   const _LatestMomentCard({
     required this.moment,
@@ -833,9 +830,9 @@ class _LatestMomentCard extends StatelessWidget {
                         caption,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: SettingsType.body(Colors.white).copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: SettingsType.body(
+                          Colors.white,
+                        ).copyWith(fontWeight: FontWeight.w600),
                       ),
                       SizedBox(height: 6),
                     ],
@@ -870,6 +867,7 @@ class _LatestMomentCard extends StatelessWidget {
     );
   }
 }
+
 class _EmptyLatest extends StatelessWidget {
   const _EmptyLatest({required this.onCamera});
 
@@ -886,6 +884,7 @@ class _EmptyLatest extends StatelessWidget {
     );
   }
 }
+
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.onReact,
@@ -970,32 +969,32 @@ class _ActionCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         child: Column(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: enabled ? AppColors.violet : AppColors.textTertiaryDark,
-              ),
-              SizedBox(height: 5),
-              Text(
-                label,
-                style: SettingsType.caption(
-                  enabled ? Colors.white : AppColors.textTertiaryDark,
-                ).copyWith(fontWeight: FontWeight.w600),
-              ),
-              SizedBox(height: 2),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: SettingsType.caption(
-                  AppColors.textTertiaryDark,
-                ).copyWith(fontSize: 9, fontWeight: FontWeight.w400),
-              ),
-            ],
-          ),
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: enabled ? AppColors.violet : AppColors.textTertiaryDark,
+            ),
+            SizedBox(height: 5),
+            Text(
+              label,
+              style: SettingsType.caption(
+                enabled ? Colors.white : AppColors.textTertiaryDark,
+              ).copyWith(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 2),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: SettingsType.caption(
+                AppColors.textTertiaryDark,
+              ).copyWith(fontSize: 9, fontWeight: FontWeight.w400),
+            ),
+          ],
         ),
+      ),
     );
   }
 }
@@ -1060,14 +1059,12 @@ class _OverflowTile extends StatelessWidget {
           color: AppColors.surfaceElevatedDark,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          '+$count',
-          style: SettingsType.title(Colors.white),
-        ),
+        child: Text('+$count', style: SettingsType.title(Colors.white)),
       ),
     );
   }
 }
+
 class _TogetherTile extends StatelessWidget {
   const _TogetherTile({
     required this.moment,
@@ -1182,10 +1179,9 @@ class _MomentTimeBadge extends StatelessWidget {
             SizedBox(width: 4),
             Text(
               _format(time),
-              style: SettingsType.caption(Colors.white).copyWith(
-                fontSize: 9,
-                fontWeight: FontWeight.w500,
-              ),
+              style: SettingsType.caption(
+                Colors.white,
+              ).copyWith(fontSize: 9, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -1329,8 +1325,7 @@ class _MembersSheet extends StatelessWidget {
                               Icons.remove_circle_outline,
                               color: AppColors.textTertiaryDark,
                             ),
-                            onPressed:
-                                state.status == CircleDetailStatus.acting
+                            onPressed: state.status == CircleDetailStatus.acting
                                 ? null
                                 : () => context
                                       .read<CircleDetailCubit>()

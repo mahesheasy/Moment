@@ -40,9 +40,9 @@ class _ChatSearchBarState extends State<ChatSearchBar> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: ChatTheme.inputBackground,
+          color: ChatTheme.inputBackground(context),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: ChatTheme.inputBorder),
+          border: Border.all(color: ChatTheme.inputBorder(context)),
         ),
         child: TextField(
           controller: widget.controller,
@@ -57,19 +57,19 @@ class _ChatSearchBarState extends State<ChatSearchBar> {
             hintText: 'Search chats',
             hintStyle: TextStyle(
               fontFamily: AppTypography.fontFamily,
-              color: ChatTheme.tertiaryText,
+              color: ChatTheme.tertiaryText(context),
               fontSize: 14,
             ),
             prefixIcon: Icon(
               AppIcons.search,
-              color: ChatTheme.tertiaryText,
+              color: ChatTheme.tertiaryText(context),
               size: 20,
             ),
             suffixIcon: hasText
                 ? IconButton(
                     icon: Icon(
                       Icons.close_rounded,
-                      color: ChatTheme.tertiaryText,
+                      color: ChatTheme.tertiaryText(context),
                       size: 18,
                     ),
                     onPressed: () {

@@ -19,6 +19,7 @@ import 'package:moment/core/widgets/moment_avatar.dart';
 import 'package:moment/core/widgets/moment_scaffold.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
+import 'package:moment/features/friends/presentation/widgets/friend_qr_sheet.dart';
 import 'package:moment/features/profile/presentation/cubit/profile_cubit.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
@@ -112,6 +113,15 @@ class _ProfileView extends StatelessWidget {
                               await context.read<ProfileCubit>().load();
                             }
                           },
+                        ),
+                        const _ProfileDivider(),
+                        _ProfileMenuRow(
+                          icon: Icons.qr_code_2_rounded,
+                          iconColor: const Color(0xFFC4A1FF),
+                          iconBackground: const Color(0x33C4A1FF),
+                          title: 'My QR code',
+                          subtitle: 'Scan to connect in person',
+                          onTap: () => showFriendQrSheet(context, profile: profile),
                         ),
                         const _ProfileDivider(),
                         _ProfileMenuRow(

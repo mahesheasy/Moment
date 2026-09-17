@@ -3,6 +3,8 @@
     <color name="moment_background">#0B090E</color>
     <color name="moment_surface">#16121A</color>
     <color name="moment_accent">#FF6B8A</color>
+    <color name="notification_accent">#FF6B8A</color>
+    <color name="notification_chat_accent">#6B8AFF</color>
     <color name="moment_text">#F8F1F4</color>
 	<color name="ic_launcher_background">#000000</color>
 </resources>

@@ -1,54 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:moment/core/theme/moment_theme.dart';
 
-/// Minimal chat palette — flat, readable, no glow or gradients.
+/// Chat palette derived from the app [MomentColors] theme extension.
 abstract final class ChatTheme {
-  static const threadBackground = Color(0xFF0D0D0F);
-  static const headerBackground = Color(0xFF0D0D0F);
-  static const receivedBubble = Color(0xFF262628);
-  static const sentBubble = Color(0xFF5E52D4);
-  static const inputBackground = Color(0xFF1C1C1E);
-  static const inputBorder = Color(0xFF2C2C2E);
-  static const divider = Color(0xFF2C2C2E);
-  static const tertiaryText = Color(0xFF8E8E93);
-  static const accent = Color(0xFF5E52D4);
-  static const readReceipt = Color(0xFF8E8E93);
   static const onlineGreen = Color(0xFF34C759);
+  static const readReceipt = Color(0xFF8E8E93);
 
-  /// Legacy alias used by inbox widgets.
-  static const accentPink = accent;
+  static Color threadBackground(BuildContext context) => context.mc.background;
 
-  static Color threadBackdrop(bool isDark) {
-    return isDark ? threadBackground : const Color(0xFFF2F2F7);
-  }
+  static Color headerBackground(BuildContext context) => context.mc.background;
 
-  static Color receivedBubbleFor(bool isDark) {
-    return isDark ? receivedBubble : const Color(0xFFE9E9EB);
-  }
+  static Color receivedBubble(BuildContext context) =>
+      context.mc.surfaceElevated;
 
-  static Color sentBubbleFor(bool isDark) {
-    return isDark ? sentBubble : const Color(0xFF5E52D4);
-  }
+  static Color sentBubble(BuildContext context) => context.mc.accent;
 
-  static Color primaryText(bool isDark) {
-    return isDark ? Colors.white : const Color(0xFF1C1C1E);
-  }
+  static Color inputBackground(BuildContext context) => context.mc.surface;
 
-  static Color secondaryText(bool isDark) {
-    return isDark ? tertiaryText : const Color(0xFF8E8E93);
-  }
+  static Color inputBorder(BuildContext context) => context.mc.border;
 
-  /// Legacy — inbox still references this name.
-  static LinearGradient threadBackdropGradient(bool isDark) {
-    final color = threadBackdrop(isDark);
+  static Color divider(BuildContext context) => context.mc.border;
+
+  static Color tertiaryText(BuildContext context) => context.mc.textTertiary;
+
+  static Color accent(BuildContext context) => context.mc.accent;
+
+  static Color primaryText(BuildContext context) => context.mc.textPrimary;
+
+  static Color secondaryText(BuildContext context) => context.mc.textSecondary;
+
+  static Color accentPink(BuildContext context) => context.mc.accent;
+
+  static LinearGradient actionGradient(BuildContext context) =>
+      context.mc.bloomGradient;
+
+  static Color threadBackdrop(BuildContext context) => context.mc.background;
+
+  static Color receivedBubbleFor(BuildContext context, bool isDark) =>
+      receivedBubble(context);
+
+  static Color sentBubbleFor(BuildContext context, bool isDark) =>
+      sentBubble(context);
+
+  static Color primaryTextFor(BuildContext context, bool isDark) =>
+      primaryText(context);
+
+  static Color secondaryTextFor(BuildContext context, bool isDark) =>
+      secondaryText(context);
+
+  static LinearGradient threadBackdropGradient(BuildContext context) {
+    final color = threadBackdrop(context);
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [color, color],
     );
   }
-
-  /// Legacy — friend chips / stories.
-  static const actionGradient = LinearGradient(
-    colors: [accent, accent],
-  );
 }

@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
@@ -8,6 +9,7 @@ import 'package:moment/core/theme/app_spacing.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
 import 'package:moment/features/moments/presentation/pages/camera_send_to_page.dart';
+import 'package:moment/features/moments/presentation/widgets/camera_captions_sheet.dart';
 import 'package:moment/features/moments/presentation/widgets/camera_chrome.dart';
 
 class CameraPreviewPage extends StatefulWidget {
@@ -19,25 +21,42 @@ class CameraPreviewPage extends StatefulWidget {
 
 class _CameraPreviewPageState extends State<CameraPreviewPage> {
   late final TextEditingController _captionController;
+  late final TextEditingController _reviewController;
 
   @override
   void initState() {
     super.initState();
-    _captionController = TextEditingController(
-      text: context.read<CameraCubit>().state.caption,
-    );
+    final cubit = context.read<CameraCubit>();
+    _captionController = TextEditingController(text: cubit.state.caption);
+    _reviewController = TextEditingController(text: cubit.state.reviewText);
+    if (cubit.state.timeLabel == null) {
+      unawaited(cubit.loadMomentContext());
+    }
   }
 
   @override
   void dispose() {
     _captionController.dispose();
+    _reviewController.dispose();
     super.dispose();
   }
 
-  void _comingSoon(String label) {
-    ScaffoldMessenger.of(
+  void _openDetails() {
+    showCameraCaptionsSheet(
       context,
-    ).showSnackBar(SnackBar(content: Text('$label is coming soon.')));
+      reviewController: _reviewController,
+    );
+  }
+
+  int _detailCount(CameraState state) {
+    var count = 0;
+    if (state.reviewRating > 0) count++;
+    if (state.includeLocation) count++;
+    if (state.includeWeather) count++;
+    if (state.includeTime) count++;
+    if (state.includeStreak) count++;
+    count += state.decorations.length;
+    return count;
   }
 
   @override
@@ -79,7 +98,17 @@ class _CameraPreviewPageState extends State<CameraPreviewPage> {
                               ),
                         ),
                       ),
-                      SizedBox(width: 48),
+                      IconButton(
+                        onPressed: _openDetails,
+                        tooltip: 'Stickers',
+                        icon: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: _detailCount(state) > 0
+                              ? AppColors.violet
+                              : Colors.white,
+                          size: 22,
+                        ),
+                      ),
                     ],
                   ),
                   TextField(
@@ -120,28 +149,7 @@ class _CameraPreviewPageState extends State<CameraPreviewPage> {
                           : Image.memory(bytes, fit: BoxFit.cover),
                     ),
                   ),
-                  SizedBox(height: AppSpacing.xxl),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _ToolButton(
-                        icon: AppIcons.wand,
-                        label: 'Edit',
-                        onTap: () => _comingSoon('Edit'),
-                      ),
-                      _ToolButton(
-                        icon: AppIcons.stickers,
-                        label: 'Stickers',
-                        onTap: () => _comingSoon('Stickers'),
-                      ),
-                      _ToolButton(
-                        icon: AppIcons.draw,
-                        label: 'Draw',
-                        onTap: () => _comingSoon('Draw'),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.xxl),
                   CameraGradientButton(
                     label: 'Next',
                     onPressed: bytes == null
@@ -164,38 +172,6 @@ class _CameraPreviewPageState extends State<CameraPreviewPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _ToolButton extends StatelessWidget {
-  const _ToolButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white, size: 26),
-          SizedBox(height: AppSpacing.sm),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

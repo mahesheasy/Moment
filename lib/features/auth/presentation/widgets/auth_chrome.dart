@@ -423,8 +423,8 @@ class _GoogleMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 22,
-      height: 22,
+      width: 20,
+      height: 20,
       child: CustomPaint(painter: _GoogleMarkPainter()),
     );
   }
@@ -435,27 +435,43 @@ class _GoogleMarkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final stroke = radius * 0.42;
+
+    canvas.drawCircle(center, radius, Paint()..color = Colors.white);
 
     void arc(Color color, double start, double sweep) {
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round;
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - stroke / 2),
+        Rect.fromCircle(center: center, radius: radius - 1.5),
         start,
         sweep,
-        false,
-        paint,
+        true,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
       );
     }
 
-    arc(const Color(0xFFEA4335), -0.4, 1.2);
-    arc(const Color(0xFFFBBC05), 0.8, 1.0);
-    arc(const Color(0xFF34A853), 1.8, 1.0);
-    arc(const Color(0xFF4285F4), 2.8, 1.0);
+    arc(const Color(0xFF4285F4), -0.55, 1.55);
+    arc(const Color(0xFF34A853), 1.0, 1.05);
+    arc(const Color(0xFFFBBC05), 2.05, 1.0);
+    arc(const Color(0xFFEA4335), 3.05, 0.95);
+
+    canvas.drawCircle(
+      center,
+      radius * 0.56,
+      Paint()..color = Colors.white,
+    );
+
+    final bar = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(center.dx + radius * 0.08, center.dy),
+        width: radius * 0.95,
+        height: radius * 0.28,
+      ),
+      bar,
+    );
   }
 
   @override

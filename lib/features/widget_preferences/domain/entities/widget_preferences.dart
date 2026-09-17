@@ -150,8 +150,8 @@ enum WidgetPrivacyMode {
   };
 
   String get description => switch (this) {
-    WidgetPrivacyMode.full => 'Show the latest photo.',
-    WidgetPrivacyMode.blur => 'Hide photo details until opened.',
+    WidgetPrivacyMode.full => 'Show the clear photo full-screen on your widget.',
+    WidgetPrivacyMode.blur => 'Blurred photo with sender details until opened.',
     WidgetPrivacyMode.private => 'Show only that you received a moment.',
   };
 
@@ -179,6 +179,7 @@ class WidgetPreferences extends Equatable {
     this.lockScreenPrivacy = true,
     this.paused = false,
     this.privacyPersonId,
+    this.privacyOverrides = const {},
     this.showStreak = true,
   });
 
@@ -195,13 +196,16 @@ class WidgetPreferences extends Equatable {
   final bool showCaptions;
   final bool lockScreenPrivacy;
   final bool paused;
-  /// When set, [privacyMode] applies only to moments from this person.
-  /// When null, privacy applies to everyone.
+  /// Legacy single-person scope. Prefer [privacyOverrides].
   final String? privacyPersonId;
+  /// Per-sender privacy mode overrides (senderId -> mode).
+  final Map<String, WidgetPrivacyMode> privacyOverrides;
   final bool showStreak;
 
   /// Resolves which privacy mode to use for a moment from [senderId].
   WidgetPrivacyMode privacyForSender(String senderId) {
+    final override = privacyOverrides[senderId];
+    if (override != null) return override;
     if (privacyPersonId == null) return privacyMode;
     if (privacyPersonId == senderId) return privacyMode;
     return WidgetPrivacyMode.full;
@@ -248,7 +252,20 @@ class WidgetPreferences extends Equatable {
       lockScreenPrivacy: json['lock_screen_privacy'] as bool? ?? true,
       paused: json['paused'] as bool? ?? false,
       privacyPersonId: json['privacy_person_id'] as String?,
+      privacyOverrides: _parsePrivacyOverrides(json['privacy_overrides']),
       showStreak: json['show_streak'] as bool? ?? true,
+    );
+  }
+
+  static Map<String, WidgetPrivacyMode> _parsePrivacyOverrides(Object? raw) {
+    if (raw is! Map) return const {};
+    return Map<String, WidgetPrivacyMode>.fromEntries(
+      raw.entries.map((entry) {
+        return MapEntry(
+          entry.key.toString(),
+          WidgetPrivacyMode.fromValue(entry.value.toString()),
+        );
+      }),
     );
   }
 
@@ -268,6 +285,10 @@ class WidgetPreferences extends Equatable {
       'lock_screen_privacy': lockScreenPrivacy,
       'paused': paused,
       'privacy_person_id': privacyPersonId,
+      'privacy_overrides': {
+        for (final entry in privacyOverrides.entries)
+          entry.key: entry.value.name,
+      },
       'show_streak': showStreak,
     };
   }
@@ -296,6 +317,10 @@ class WidgetPreferences extends Equatable {
       'p_lock_screen_privacy': lockScreenPrivacy,
       'p_paused': paused,
       'p_privacy_person_id': privacyPersonId,
+      'p_privacy_overrides': {
+        for (final entry in privacyOverrides.entries)
+          entry.key: entry.value.name,
+      },
     };
   }
 
@@ -309,6 +334,7 @@ class WidgetPreferences extends Equatable {
       paused: other.paused,
       privacyPersonId: other.privacyPersonId,
       clearPrivacyPerson: other.privacyPersonId == null,
+      privacyOverrides: other.privacyOverrides,
     );
   }
 
@@ -336,6 +362,7 @@ class WidgetPreferences extends Equatable {
       paused: local.paused,
       privacyPersonId: local.privacyPersonId,
       clearPrivacyPerson: local.privacyPersonId == null,
+      privacyOverrides: local.privacyOverrides,
       showStreak: local.showStreak,
     );
   }
@@ -355,6 +382,7 @@ class WidgetPreferences extends Equatable {
     bool? lockScreenPrivacy,
     bool? paused,
     String? privacyPersonId,
+    Map<String, WidgetPrivacyMode>? privacyOverrides,
     bool? showStreak,
     bool clearPerson = false,
     bool clearCircle = false,
@@ -381,6 +409,7 @@ class WidgetPreferences extends Equatable {
       privacyPersonId: clearPrivacyPerson
           ? null
           : privacyPersonId ?? this.privacyPersonId,
+      privacyOverrides: privacyOverrides ?? this.privacyOverrides,
       showStreak: showStreak ?? this.showStreak,
     );
   }
@@ -401,6 +430,7 @@ class WidgetPreferences extends Equatable {
     lockScreenPrivacy,
     paused,
     privacyPersonId,
+    privacyOverrides,
     showStreak,
   ];
 }

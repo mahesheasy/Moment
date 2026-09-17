@@ -48,16 +48,25 @@ class _MomentSpaceTimelineState extends State<MomentSpaceTimeline> {
   }
 
   Future<void> _resolveMedia() async {
+    final activeIds = <String>{};
     for (final row in widget.rows) {
       if (row is! MomentTimelineEntryRow) continue;
-      final path = row.entry.mediaUrl;
-      if (path == null || path.isEmpty || _mediaUrls.containsKey(row.entry.id)) {
+      final entry = row.entry;
+      activeIds.add(entry.id);
+
+      if (entry.isDeleted || entry.mediaUrl == null || entry.mediaUrl!.isEmpty) {
+        _mediaUrls.remove(entry.id);
         continue;
       }
-      final url = await _resolver.resolve(path);
+
+      if (_mediaUrls.containsKey(entry.id)) continue;
+
+      final url = await _resolver.resolve(entry.mediaUrl);
       if (!mounted) return;
-      setState(() => _mediaUrls[row.entry.id] = url);
+      setState(() => _mediaUrls[entry.id] = url);
     }
+
+    _mediaUrls.removeWhere((id, _) => !activeIds.contains(id));
   }
 
   @override
@@ -78,7 +87,9 @@ class _MomentSpaceTimelineState extends State<MomentSpaceTimeline> {
           MomentTimelineEntryRow(:final entry) => _TimelineItem(
               entry: entry,
               otherUser: widget.otherUser,
-              mediaUrl: _mediaUrls[entry.id],
+              mediaUrl: entry.isDeleted || entry.mediaUrl == null
+                  ? null
+                  : _mediaUrls[entry.id],
               onAddReaction: () => widget.onAddReaction?.call(entry),
               onMenu: () => widget.onMomentMenu?.call(entry),
               onLongPress: () => widget.onLongPress?.call(entry),

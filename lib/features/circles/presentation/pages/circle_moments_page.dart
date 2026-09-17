@@ -10,6 +10,7 @@ import 'package:moment/core/widgets/moment_avatar.dart';
 import 'package:moment/core/widgets/moment_cached_image.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/circles/presentation/cubit/circle_detail_cubit.dart';
+import 'package:moment/features/circles/presentation/widgets/circle_icon.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
@@ -37,9 +38,6 @@ class _CircleMomentsView extends StatelessWidget {
     return BlocBuilder<CircleDetailCubit, CircleDetailState>(
       builder: (context, state) {
         final circle = state.circle;
-        final title = circle == null
-            ? 'Moments together'
-            : '${circle.emoji} ${circle.name}';
 
         return Scaffold(
           backgroundColor: AppColors.backgroundDark,
@@ -51,13 +49,32 @@ class _CircleMomentsView extends StatelessWidget {
               onPressed: () => context.pop(),
               icon: const Icon(AppIcons.back, size: 18),
             ),
-            title: Text(
-              title,
-              style: SettingsType.title(Colors.white).copyWith(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            title: circle == null
+                ? Text(
+                    'Moments together',
+                    style: SettingsType.title(Colors.white).copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleIcon(circle: circle, size: 28, radius: 8),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          circle.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SettingsType.title(Colors.white).copyWith(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
           body: switch (state.status) {
             CircleDetailStatus.loading when circle == null =>

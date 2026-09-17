@@ -114,7 +114,9 @@ class ChatRemoteDataSource {
 
       final profileRow = await _client
           .from('profiles')
-          .select()
+          .select(
+            'id, username, display_name, avatar_url, bio, created_at, last_seen_at',
+          )
           .eq('id', otherId)
           .maybeSingle();
       if (profileRow == null) continue;
@@ -190,11 +192,12 @@ reply_to:reply_to_message_id (
     required String userId,
     required String conversationId,
     Set<String>? cachedHiddenIds,
+    Set<String>? cachedStarredIds,
   }) async {
     if (rows.isEmpty) return const [];
 
     final hiddenIds = cachedHiddenIds ?? await _loadHiddenIds(userId);
-    final starredIds = await _loadStarredIds(userId);
+    final starredIds = cachedStarredIds ?? await _loadStarredIds(userId);
 
     final messageIds = rows.map((row) => row['id'] as String).toList();
     final reactionRows = await _client
@@ -293,7 +296,7 @@ reply_to:reply_to_message_id (
       _ => 'jpg',
     };
     final storagePath =
-        'chat/$conversationId/${_uuid.v4()}.$extension';
+        '$userId/chat/$conversationId/${_uuid.v4()}.$extension';
 
     await _client.storage.from(_mediaBucket).uploadBinary(
       storagePath,
@@ -315,13 +318,13 @@ reply_to:reply_to_message_id (
       userId: senderId,
       conversationId: conversationId,
       bytes: bytes,
-      mimeType: mimeType,
+      mimeType: 'image/jpeg',
     );
 
     return sendMessage(
       conversationId: conversationId,
       senderId: senderId,
-      body: 'Photo',
+      body: '',
       type: ChatMessageType.image,
       mediaUrl: storagePath,
       replyToMessageId: replyToMessageId,
@@ -385,14 +388,10 @@ reply_to:reply_to_message_id (
     required bool starred,
   }) async {
     if (starred) {
-      await _client.from('chat_message_stars').upsert(
-        {
-          'message_id': messageId,
-          'user_id': userId,
-        },
-        onConflict: 'message_id,user_id',
-        ignoreDuplicates: true,
-      );
+      await _client.from('chat_message_stars').upsert({
+        'message_id': messageId,
+        'user_id': userId,
+      });
       return;
     }
 
@@ -415,6 +414,7 @@ reply_to:reply_to_message_id (
         })
         .eq('id', messageId)
         .eq('sender_id', userId)
+        .isFilter('read_at', null)
         .select(_messageSelect)
         .single();
 
@@ -436,6 +436,7 @@ reply_to:reply_to_message_id (
   Stream<List<ChatMessage>> watchMessages(String conversationId, String userId) {
     List<Map<String, dynamic>> lastRows = [];
     Set<String> cachedHiddenIds = {};
+    Set<String> cachedStarredIds = {};
     Timer? reactionDebounce;
 
     Future<void> emitRows(void Function(List<ChatMessage>) onData) async {
@@ -446,6 +447,7 @@ reply_to:reply_to_message_id (
         userId: userId,
         conversationId: conversationId,
         cachedHiddenIds: cachedHiddenIds,
+        cachedStarredIds: cachedStarredIds,
       );
       onData(messages);
     }
@@ -453,6 +455,7 @@ reply_to:reply_to_message_id (
     return Stream<List<ChatMessage>>.multi((multi) {
       StreamSubscription<List<Map<String, dynamic>>>? messagesSub;
       StreamSubscription<List<Map<String, dynamic>>>? reactionsSub;
+      StreamSubscription<List<Map<String, dynamic>>>? starsSub;
 
       messagesSub = _client
           .from('chat_messages')
@@ -463,6 +466,7 @@ reply_to:reply_to_message_id (
             (rows) async {
               lastRows = rows;
               cachedHiddenIds = await _loadHiddenIds(userId);
+              cachedStarredIds = await _loadStarredIds(userId);
               emitRows(multi.add);
             },
             onError: multi.addError,
@@ -496,11 +500,26 @@ reply_to:reply_to_message_id (
             onError: (_) {},
           );
 
+      starsSub = _client
+          .from('chat_message_stars')
+          .stream(primaryKey: ['message_id', 'user_id'])
+          .eq('user_id', userId)
+          .listen(
+            (rows) {
+              cachedStarredIds = rows
+                  .map((row) => row['message_id'] as String)
+                  .toSet();
+              emitRows(multi.add);
+            },
+            onError: (_) {},
+          );
+
       multi.onCancel = () async {
         reactionDebounce?.cancel();
         await messagesSub?.cancel();
         await reactionsSub?.cancel();
         await hiddenSub.cancel();
+        await starsSub?.cancel();
       };
     });
   }

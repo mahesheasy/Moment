@@ -26,7 +26,7 @@ Future<ChatMessageSheetAction?> showChatMessageActionsSheet({
   return showModalBottomSheet<ChatMessageSheetAction>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: MomentSpaceTheme.surfaceElevated,
+    backgroundColor: MomentSpaceTheme.surfaceElevated(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -107,9 +107,7 @@ Future<ChatMessageSheetAction?> showChatMessageActionsSheet({
                   onTap: () =>
                       Navigator.pop(context, ChatMessageSheetAction.react),
                 ),
-              if (message.isMine &&
-                  !message.deletedForEveryone &&
-                  message.messageType == ChatMessageType.text)
+              if (message.canEdit)
                 _ActionTile(
                   icon: Icons.edit_outlined,
                   label: 'Edit',
@@ -184,7 +182,7 @@ class _EmojiChip extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Material(
-        color: MomentSpaceTheme.composerPillBackground,
+        color: MomentSpaceTheme.composerPillBackground(context),
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           onTap: onTap,

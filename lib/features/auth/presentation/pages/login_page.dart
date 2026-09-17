@@ -9,7 +9,10 @@ import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/core/widgets/moment_sheet_dialog.dart';
 import 'package:moment/features/auth/domain/validators/auth_validators.dart';
 import 'package:moment/features/auth/presentation/cubit/auth_form_cubit.dart';
+import 'package:moment/features/auth/presentation/cubit/username_field_cubit.dart';
 import 'package:moment/features/auth/presentation/widgets/auth_chrome.dart';
+import 'package:moment/features/auth/presentation/widgets/register_username_field.dart';
+import 'package:moment/features/settings/presentation/widgets/legal_terms_footer.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -179,6 +182,10 @@ class _LoginViewState extends State<_LoginView> {
                     action: 'Create account',
                     onTap: () => context.go(AppRoutes.register),
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  const LegalTermsFooter(
+                    leadingText: 'By signing in, you agree to our ',
+                  ),
                   const SizedBox(height: AppSpacing.xxl),
                 ],
                 ),
@@ -234,8 +241,11 @@ class RegisterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => sl<RegisterCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => sl<RegisterCubit>()),
+        BlocProvider(create: (_) => sl<UsernameFieldCubit>()),
+      ],
       child: const _RegisterView(),
     );
   }
@@ -274,6 +284,18 @@ class _RegisterViewState extends State<_RegisterView> {
   }
 
   void _submitRegister() {
+    final usernameState = context.read<UsernameFieldCubit>().state;
+    if (usernameState.status != UsernameCheckStatus.available) {
+      _formKey.currentState?.validate();
+      if (usernameState.username.isNotEmpty) {
+        context.read<UsernameFieldCubit>().recheck(_displayNameController.text);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose an available username.')),
+      );
+      return;
+    }
+
     if (!(_formKey.currentState?.validate() ?? false)) return;
     context.read<RegisterCubit>().submit(
       email: _emailController.text,
@@ -369,15 +391,11 @@ class _RegisterViewState extends State<_RegisterView> {
                     validator: AuthValidators.displayNameField,
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  AuthTextField(
+                  RegisterUsernameField(
                     controller: _usernameController,
-                    hint: 'Username',
-                    icon: Icons.alternate_email_rounded,
-                    autocorrect: false,
-                    textInputAction: TextInputAction.next,
-                    validator: AuthValidators.usernameField,
+                    displayNameController: _displayNameController,
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.md),
                   AuthTextField(
                     controller: _emailController,
                     hint: 'Email',
@@ -409,7 +427,7 @@ class _RegisterViewState extends State<_RegisterView> {
                     },
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  _TermsText(accent: mc.accent, secondary: mc.textTertiary),
+                  const LegalTermsFooter(),
                   const SizedBox(height: AppSpacing.xxxl),
                   const AuthOrDivider(),
                   const SizedBox(height: AppSpacing.xxl),
@@ -428,40 +446,6 @@ class _RegisterViewState extends State<_RegisterView> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TermsText extends StatelessWidget {
-  const _TermsText({required this.accent, required this.secondary});
-
-  final Color accent;
-  final Color secondary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(
-        style: TextStyle(color: secondary, fontSize: 11, height: 1.45),
-        children: [
-          const TextSpan(text: 'By creating an account, you agree to our '),
-          TextSpan(
-            text: 'Terms of Service',
-            style: TextStyle(color: accent, fontWeight: FontWeight.w500),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => showAuthComingSoon(context, 'Terms'),
-          ),
-          const TextSpan(text: ' and '),
-          TextSpan(
-            text: 'Privacy Policy',
-            style: TextStyle(color: accent, fontWeight: FontWeight.w500),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () => showAuthComingSoon(context, 'Privacy'),
-          ),
-          const TextSpan(text: '.'),
-        ],
-      ),
-      textAlign: TextAlign.center,
     );
   }
 }

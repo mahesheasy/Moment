@@ -50,7 +50,7 @@ class _ChatTypingIndicatorState extends State<ChatTypingIndicator>
             '$firstName is typing',
             style: TextStyle(
               fontFamily: AppTypography.fontFamily,
-              color: ChatTheme.tertiaryText,
+              color: ChatTheme.tertiaryText(context),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -67,7 +67,7 @@ class _ChatTypingIndicatorState extends State<ChatTypingIndicator>
                     height: 5,
                     margin: const EdgeInsets.symmetric(horizontal: 1.5),
                     decoration: BoxDecoration(
-                      color: ChatTheme.accentPink.withValues(
+                      color: ChatTheme.accentPink(context).withValues(
                         alpha: 0.35 + (phase * 0.65),
                       ),
                       shape: BoxShape.circle,

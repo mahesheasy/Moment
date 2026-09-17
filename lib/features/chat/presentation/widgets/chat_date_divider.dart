@@ -16,7 +16,7 @@ class ChatDateDivider extends StatelessWidget {
           label,
           style: TextStyle(
             fontFamily: AppTypography.fontFamily,
-            color: ChatTheme.tertiaryText,
+            color: ChatTheme.tertiaryText(context),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),

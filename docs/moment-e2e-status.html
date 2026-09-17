@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moment — End-to-End Status</title>
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface2: #1c1c1f;
+      --border: #2a2a2e;
+      --text: #f2f2f5;
+      --muted: #9a9aa3;
+      --pink: #ff6b8a;
+      --coral: #ff8a6b;
+      --green: #4ade80;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --blue: #60a5fa;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    .wrap { max-width: 960px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--pink), var(--coral));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .meta span {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      margin: 2.25rem 0 1rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h2::before {
+      content: "";
+      width: 4px;
+      height: 1.25rem;
+      background: var(--pink);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--coral);
+    }
+
+    p, li { color: #d4d4d8; font-size: 0.95rem; }
+
+    p { margin-bottom: 0.75rem; }
+
+    ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
+    li { margin-bottom: 0.35rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.35rem;
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.75rem 0 1rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    code, .path {
+      font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+      font-size: 0.82rem;
+      background: var(--surface2);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: var(--blue);
+      word-break: break-all;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .badge-done { background: #14532d; color: var(--green); }
+    .badge-partial { background: #422006; color: var(--yellow); }
+    .badge-pending { background: #450a0a; color: var(--red); }
+    .badge-na { background: var(--surface2); color: var(--muted); }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      margin: 1rem 0;
+    }
+
+    .flow-step {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.85rem;
+    }
+
+    .flow-arrow { color: var(--muted); font-size: 1.1rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .checklist { list-style: none; margin-left: 0; }
+    .checklist li {
+      padding: 0.45rem 0;
+      padding-left: 1.75rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before {
+      content: "☐";
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .toc h2 { margin-top: 0; font-size: 1rem; }
+    .toc h2::before { display: none; }
+    .toc ol { margin-bottom: 0; }
+    .toc a { color: var(--pink); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    @media print {
+      body { background: #fff; color: #111; padding: 1rem; }
+      .card, table th { background: #f5f5f5; }
+      header h1 { -webkit-text-fill-color: #111; color: #111; }
+      .badge-done { background: #dcfce7; color: #166534; }
+      .badge-partial { background: #fef9c3; color: #854d0e; }
+      .badge-pending { background: #fee2e2; color: #991b1b; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header>
+      <h1>Moment — End-to-End Status</h1>
+      <p>Complete documentation of the Android home widget overhaul, smart unread system, empty states, privacy/reveal, home/camera UI, and what remains.</p>
+      <div class="meta">
+        <span>Project: Moment</span>
+        <span>Version: 1.8.1+19</span>
+        <span>Platform: Flutter + Android (Kotlin/Glance)</span>
+        <span>Updated: Sep 5, 2026</span>
+        <span>Supabase: rqnzwvzziqflgipxiciz</span>
+      </div>
+      <p style="margin-top:1rem;font-size:0.9rem">
+        <strong>File path:</strong>
+        <code>c:\Users\Lucky\projects\moment\docs\moment-e2e-status.html</code>
+        — open in Chrome/Edge (double-click or drag into browser). Print to PDF with Ctrl+P.
+      </p>
+    </header>
+
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#widget-unread">Smart Unread Widget</a></li>
+        <li><a href="#empty-states">Empty / All-Caught-Up States</a></li>
+        <li><a href="#privacy">Privacy &amp; Reveal</a></li>
+        <li><a href="#sync">Widget Sync Paths</a></li>
+        <li><a href="#customization">Widget Customization</a></li>
+        <li><a href="#home-camera">Home / Camera UI</a></li>
+        <li><a href="#working">What's Working End-to-End</a></li>
+        <li><a href="#partial">Partially Done</a></li>
+        <li><a href="#not-started">Not Started / Not Working</a></li>
+        <li><a href="#bugs-fixed">Bugs Fixed</a></li>
+        <li><a href="#checklist">Completion Checklist</a></li>
+        <li><a href="#files">File Map</a></li>
+        <li><a href="#testing">Testing &amp; Verification</a></li>
+        <li><a href="#flows">User Journey Flows</a></li>
+        <li><a href="#api">Flutter ↔ Android API</a></li>
+        <li><a href="#deeplinks">Deep Links</a></li>
+        <li><a href="#changelog">This Session — What We Built</a></li>
+      </ol>
+    </nav>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <h2>1. Overview</h2>
+      <div class="card">
+        <p>Moment is a private social-memory app. The home-screen <strong>Android widget</strong> was rebuilt to behave like a smart notification surface — not a photo gallery. It shows the <strong>newest unread moment only</strong>, advances after viewing, and shows a time-of-day empty state when caught up.</p>
+        <p>Separately, the <strong>Home tab</strong> was redesigned as a camera-first screen (live viewfinder, shutter, gallery, flip) with Memories opened by swipe-up and History in a bottom sheet.</p>
+      </div>
+
+      <h3>Architecture</h3>
+      <div class="flow">
+        <span class="flow-step">Supabase (moments, seen_at)</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">Flutter (selection, read cache, prefs)</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">Method Channel</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">Kotlin (queue, images, Glance UI)</span>
+      </div>
+    </section>
+
+    <!-- SMART UNREAD -->
+    <section id="widget-unread">
+      <h2>2. Smart Unread Widget</h2>
+      <p>The widget must <strong>not</strong> behave like a gallery. It is a single unread-moment surface.</p>
+
+      <table>
+        <thead>
+          <tr><th>Behavior</th><th>Status</th><th>Details</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Show newest unread moment only</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Queue capped at 1 entry (<code>MAX_ENTRIES = 1</code>)</td>
+          </tr>
+          <tr>
+            <td>● prefix on unread sender</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td><code>FullMomentLayout</code> in Glance widget</td>
+          </tr>
+          <tr>
+            <td>Mark read when opened in app</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td><code>onMomentViewed</code> → read cache → sync</td>
+          </tr>
+          <tr>
+            <td>Advance to next unread after view</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Sync pushes next or clears widget</td>
+          </tr>
+          <tr>
+            <td>Empty state when all caught up</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>No read-moment fallback</td>
+          </tr>
+          <tr>
+            <td>Show read moment without ●</td>
+            <td><span class="badge badge-done">Removed</span></td>
+            <td>Was a bug — intentionally removed</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Key Flutter files</h3>
+      <ul>
+        <li><span class="path">lib/core/widget/widget_moment_selector.dart</span> — unread-only; returns empty if no unread</li>
+        <li><span class="path">lib/core/widget/widget_read_cache.dart</span> — optimistic local read IDs (SharedPreferences)</li>
+        <li><span class="path">lib/core/widget/home_widget_sync_service.dart</span> — sync prefs, push moment, or clear widget</li>
+        <li><span class="path">lib/core/widget/android_widget_bridge_io.dart</span> — native method channel</li>
+        <li><span class="path">lib/features/moments/data/repositories/moment_repository_impl.dart</span> — <code>getWidgetDisplayMoment()</code></li>
+      </ul>
+
+      <h3>Key Android files</h3>
+      <ul>
+        <li><span class="path">widget/WidgetMomentQueue.kt</span> — single-moment queue, <code>markViewed</code> clears display</li>
+        <li><span class="path">widget/MomentGlanceWidget.kt</span> — Glance UI rendering</li>
+        <li><span class="path">widget/WidgetSupabaseSync.kt</span> — background fetch, unseen only</li>
+        <li><span class="path">WidgetBridgePlugin.kt</span> — Flutter ↔ native bridge</li>
+      </ul>
+    </section>
+
+    <!-- EMPTY STATES -->
+    <section id="empty-states">
+      <h2>3. Empty / All-Caught-Up States</h2>
+      <p>When there are <strong>no moments</strong> or <strong>all moments are seen</strong>, the widget shows a time-of-day illustration. Tap opens camera.</p>
+
+      <table>
+        <thead>
+          <tr><th>Time of day</th><th>Image</th><th>Asset</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>6:00 AM – 11:59 AM</td>
+            <td>Morning — kitten waking up</td>
+            <td><code>widget_empty_moments_morning.png</code></td>
+          </tr>
+          <tr>
+            <td>12:00 PM – 5:59 PM</td>
+            <td>Afternoon — kitten, sun, books, coffee</td>
+            <td><code>widget_empty_moments_afternoon.jpg</code></td>
+          </tr>
+          <tr>
+            <td>6:00 PM – 5:59 AM</td>
+            <td>Night — cat by window</td>
+            <td><code>widget_empty_moments_night.png</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <ul>
+        <li>Logic: <span class="path">widget/WidgetEmptyStateImages.kt</span></li>
+        <li>Layout: <span class="path">LocketEmptyLayout</span> in <span class="path">MomentGlanceWidget.kt</span></li>
+        <li>Tap action: <code>moment://camera</code></li>
+        <li>Widget refreshes ~every minute (switches at 6 AM / 12 PM / 6 PM)</li>
+      </ul>
+    </section>
+
+    <!-- PRIVACY -->
+    <section id="privacy">
+      <h2>4. Privacy &amp; Reveal System</h2>
+
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>Status</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Global privacy mode (full / blur / private)</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Synced from Flutter widget prefs</td>
+          </tr>
+          <tr>
+            <td>Per-sender privacy overrides</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Supabase jsonb + Flutter UI + Android store</td>
+          </tr>
+          <tr>
+            <td>Blur mode on widget</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td><code>BlurMomentLayout</code></td>
+          </tr>
+          <tr>
+            <td>Private mode ("Tap to reveal")</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td><code>PrivateMomentLayout</code></td>
+          </tr>
+          <tr>
+            <td>Full mode — blurred on widget</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Reveal chip top-right (Glance has no long-press)</td>
+          </tr>
+          <tr>
+            <td>WidgetRevealActivity (3s countdown)</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td>Full-bleed reveal activity</td>
+          </tr>
+          <tr>
+            <td>Unlock one-shot clear frame</td>
+            <td><span class="badge badge-done">Working</span></td>
+            <td><code>WidgetUserPresentReceiver</code> (≤2 min old moments)</td>
+          </tr>
+          <tr>
+            <td>Lock-screen privacy enforcement</td>
+            <td><span class="badge badge-partial">Partial</span></td>
+            <td>Pref saved but not read in Glance render path</td>
+          </tr>
+          <tr>
+            <td>Old preview timer / stack cards</td>
+            <td><span class="badge badge-done">Removed</span></td>
+            <td>Replaced by grid/reveal approach</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Migration: <span class="path">supabase/migrations/20260902100000_widget_privacy_overrides.sql</span></p>
+    </section>
+
+    <!-- SYNC -->
+    <section id="sync">
+      <h2>5. Widget Sync Paths</h2>
+      <p>All five sync paths are implemented:</p>
+
+      <table>
+        <thead>
+          <tr><th>#</th><th>Trigger</th><th>Component</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>App open / resume</td>
+            <td><code>HomeWidgetSyncService.sync()</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Supabase Realtime insert</td>
+            <td><code>WidgetMomentStreamService</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>FCM push (app killed)</td>
+            <td><code>MomentFirebaseMessagingService</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>WorkManager periodic (~15 min)</td>
+            <td><code>WidgetBackgroundSyncWorker</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Supabase REST (Flutter dead)</td>
+            <td><code>WidgetSupabaseSync</code> — unseen only</td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CUSTOMIZATION -->
+    <section id="customization">
+      <h2>6. Widget Customization (Flutter)</h2>
+
+      <table>
+        <thead>
+          <tr><th>Feature</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Relationship themes (minimal, love, family, sunset, midnight, memory, etc.)</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Accent color, typography, display size</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Widget mode (latest / person / circle)</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Privacy settings page</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Pin widget to home screen</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Streak badge on widget</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Paused widget state</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Removed "Widget setup" from Settings</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>In-app style preview</td><td><span class="badge badge-done">Working</span></td></tr>
+          <tr><td>Preview "swipe stack" (multi-moment)</td><td><span class="badge badge-partial">Partial</span> — only 1 moment synced</td></tr>
+        </tbody>
+      </table>
+
+      <p>Settings: <span class="path">lib/features/widget_preferences/presentation/pages/</span></p>
+    </section>
+
+    <!-- HOME CAMERA -->
+    <section id="home-camera">
+      <h2>7. Home / Camera UI Changes</h2>
+      <p>The Home tab is now a <strong>live camera-first</strong> screen, not a feed.</p>
+
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Implementation</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Live camera viewfinder</td>
+            <td><code>LiveCameraHost</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Shutter button (coral ring)</td>
+            <td><code>_HomeCaptureBar</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Gallery button (custom icon, 52×52)</td>
+            <td><code>home_gallery_icon.png</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Camera flip button (custom icon, 52×52)</td>
+            <td><code>home_camera_icon.png</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Flash toggle on viewfinder</td>
+            <td><code>_FlashChip</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Top bar — profile, Friends pill, notifications bell</td>
+            <td><code>_HomeTopBar</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Memories — swipe up (no text/arrow)</td>
+            <td><code>MemoriesOverlayController</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>History bottom sheet</td>
+            <td><code>_HistorySheet</code> + moment deck</td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td>Realtime moment refresh</td>
+            <td><code>MomentRealtimeSubscriber</code></td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Main file: <span class="path">lib/features/moments/presentation/pages/home_page.dart</span></p>
+    </section>
+
+    <!-- WORKING E2E -->
+    <section id="working">
+      <h2>8. What's Working End-to-End</h2>
+
+      <h3>Widget flow (test on device)</h3>
+      <ol>
+        <li>Friend sends moment → widget shows it with ● on sender name</li>
+        <li>Open moment in app → marks read → widget clears or shows next unread</li>
+        <li>All caught up → time-of-day empty image (morning / afternoon / night)</li>
+        <li>Tap empty widget → camera opens (<code>moment://camera</code>)</li>
+        <li>Kill app → FCM or WorkManager still updates widget</li>
+        <li>Privacy modes render: blur, private, full + reveal chip</li>
+        <li>Reveal chip → 3-second full photo in <code>WidgetRevealActivity</code></li>
+        <li>Customize widget theme/privacy in Settings → Widget</li>
+      </ol>
+
+      <h3>App flow (test on device)</h3>
+      <ol>
+        <li>Home tab = live camera + shutter</li>
+        <li>Swipe up anywhere → Memories overlay</li>
+        <li>Tap "History" → moment deck bottom sheet</li>
+        <li>Gallery + flip icons visible on capture bar</li>
+        <li>Notifications bell (top right) → notifications page</li>
+        <li>Capture photo → send flow → moment appears for friends</li>
+      </ol>
+    </section>
+
+    <!-- PARTIAL -->
+    <section id="partial">
+      <h2>9. Partially Done — Needs Work</h2>
+
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Issue</th><th>Priority</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Lock-screen privacy</td>
+            <td><code>lockScreenPrivacy</code> pref saved but not enforced in Glance render</td>
+            <td><span class="badge badge-partial">Medium</span></td>
+          </tr>
+          <tr>
+            <td>Multi-moment cycling</td>
+            <td>Grid/cycle UI exists; queue capped at 1 — cycle is a no-op</td>
+            <td><span class="badge badge-partial">Low</span></td>
+          </tr>
+          <tr>
+            <td>Widget reaction buttons (❤️ 👋)</td>
+            <td>Deep links exist in Flutter; no native widget UI buttons</td>
+            <td><span class="badge badge-partial">Medium</span></td>
+          </tr>
+          <tr>
+            <td>Widget ping action</td>
+            <td>Routing ready (<code>moment://widget/ping/{id}</code>); no widget UI</td>
+            <td><span class="badge badge-partial">Low</span></td>
+          </tr>
+          <tr>
+            <td>Customization preview stack</td>
+            <td>UI copy says "swipe stack" but only 1 moment synced</td>
+            <td><span class="badge badge-partial">Low</span></td>
+          </tr>
+          <tr>
+            <td>Circle-mode realtime filter</td>
+            <td><code>WidgetMomentStreamService</code> may not filter by circle membership</td>
+            <td><span class="badge badge-partial">Medium</span></td>
+          </tr>
+          <tr>
+            <td>Thumbnail-only pipeline</td>
+            <td>Spec mentioned thumbnails; full images still downloaded for widget</td>
+            <td><span class="badge badge-partial">Low</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- NOT STARTED -->
+    <section id="not-started">
+      <h2>10. Not Started / Not Working</h2>
+
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>iOS WidgetKit widget</td>
+            <td>Android only. <code>android_widget_bridge_stub.dart</code> no-ops on iOS.</td>
+          </tr>
+          <tr>
+            <td>Native Android widget tests</td>
+            <td>No Kotlin/Glance instrumentation tests under <code>android/</code></td>
+          </tr>
+          <tr>
+            <td>Integration tests</td>
+            <td><code>HomeWidgetSyncService</code>, bridge, FCM path untested</td>
+          </tr>
+          <tr>
+            <td>Video capture</td>
+            <td><code>camera_placeholder_page.dart</code> — "coming soon"</td>
+          </tr>
+          <tr>
+            <td>Social sign-in</td>
+            <td>Placeholder in auth chrome</td>
+          </tr>
+          <tr>
+            <td>Widget reaction UI on home screen</td>
+            <td>Spec § reactions on widget — Flutter deep links only</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- BUGS FIXED -->
+    <section id="bugs-fixed">
+      <h2>11. Bugs Fixed During This Work</h2>
+
+      <table>
+        <thead>
+          <tr><th>Bug</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Widget showed same moment after viewing in app</td>
+            <td>Always call <code>onMomentViewed</code> + full sync; clear widget when caught up</td>
+          </tr>
+          <tr>
+            <td>Widget showed read moment without ● (fallback)</td>
+            <td>Removed read-moment fallback in selector + Supabase sync</td>
+          </tr>
+          <tr>
+            <td>2×2 grid showed stale duplicate moment</td>
+            <td>Single-moment queue + unread-first selection</td>
+          </tr>
+          <tr>
+            <td>Empty state image too small / wrong crop</td>
+            <td>Trimmed assets + <code>ContentScale.Crop</code></td>
+          </tr>
+          <tr>
+            <td>Gallery/camera icons invisible on home screen</td>
+            <td>Converted PNGs to white on transparent; grey button backgrounds</td>
+          </tr>
+          <tr>
+            <td>Glance compile errors (onLongClick, defaultWeight)</td>
+            <td>Reveal chip instead of long-press; fixed imports</td>
+          </tr>
+          <tr>
+            <td>Reveal vs tap — Reveal marked read incorrectly</td>
+            <td>Only opening moment in app marks read; Reveal does not</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CHECKLIST -->
+    <section id="checklist">
+      <h2>12. Completion Checklist</h2>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--red)">P0 — Verify on device</h3>
+          <ul class="checklist">
+            <li>Widget unread → view in app → empty state</li>
+            <li>All 3 empty state images (morning / afternoon / night)</li>
+            <li>Widget updates when app is killed (FCM / background sync)</li>
+            <li>Privacy modes: blur, private, full + reveal</li>
+            <li>Camera home: icons, swipe up memories, notifications bell</li>
+            <li>Remove &amp; re-add widget after native changes</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--yellow)">P1 — Finish partial features</h3>
+          <ul class="checklist">
+            <li>Wire <code>lockScreenPrivacy</code> into Glance render</li>
+            <li>Add widget reaction buttons (❤️ 👋)</li>
+            <li>Fix circle-mode realtime eligibility filter</li>
+            <li>Align customization preview copy with single-moment</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--blue)">P2 — Quality &amp; platform</h3>
+          <ul class="checklist">
+            <li>Integration tests for <code>HomeWidgetSyncService</code></li>
+            <li>Android instrumentation test for Glance states</li>
+            <li>iOS WidgetKit (if launch requirement)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;color:var(--muted)">P3 — Polish</h3>
+          <ul class="checklist">
+            <li>Thumbnail-only download for widget</li>
+            <li>Structured debug logging per sync path</li>
+            <li>Video capture on camera tab</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FILES -->
+    <section id="files">
+      <h2>13. File Map</h2>
+
+      <h3>Flutter — Widget core</h3>
+      <ul>
+        <li><span class="path">lib/core/widget/home_widget_sync_service.dart</span></li>
+        <li><span class="path">lib/core/widget/widget_moment_selector.dart</span></li>
+        <li><span class="path">lib/core/widget/widget_read_cache.dart</span></li>
+        <li><span class="path">lib/core/widget/widget_moment_stream_service.dart</span></li>
+        <li><span class="path">lib/core/widget/android_widget_bridge_io.dart</span></li>
+        <li><span class="path">lib/features/widget_preferences/</span></li>
+      </ul>
+
+      <h3>Android — Widget native</h3>
+      <ul>
+        <li><span class="path">widget/MomentGlanceWidget.kt</span> — Glance UI</li>
+        <li><span class="path">widget/WidgetEmptyStateImages.kt</span> — day/night empty art</li>
+        <li><span class="path">widget/WidgetSupabaseSync.kt</span> — background sync</li>
+        <li><span class="path">widget/WidgetMomentQueue.kt</span> — moment queue</li>
+        <li><span class="path">widget/WidgetRevealActivity.kt</span> — reveal activity</li>
+        <li><span class="path">widget/WidgetPrivacyResolver.kt</span> — privacy resolution</li>
+        <li><span class="path">widget/MomentFirebaseMessagingService.kt</span> — FCM</li>
+        <li><span class="path">WidgetBridgePlugin.kt</span> — Flutter bridge</li>
+      </ul>
+
+      <h3>Home / Camera UI</h3>
+      <ul>
+        <li><span class="path">lib/features/moments/presentation/pages/home_page.dart</span></li>
+        <li><span class="path">lib/features/moments/presentation/widgets/live_camera_host.dart</span></li>
+      </ul>
+
+      <h3>Assets</h3>
+      <ul>
+        <li><span class="path">assets/images/home_gallery_icon.png</span></li>
+        <li><span class="path">assets/images/home_camera_icon.png</span></li>
+        <li><span class="path">assets/images/widget_empty_moments_morning.png</span></li>
+        <li><span class="path">assets/images/widget_empty_moments_afternoon.jpg</span></li>
+        <li><span class="path">assets/images/widget_empty_moments_night.png</span></li>
+        <li><span class="path">android/app/src/main/res/drawable/widget_empty_moments_*</span></li>
+      </ul>
+
+      <h3>Supabase migrations</h3>
+      <ul>
+        <li><span class="path">supabase/migrations/20260815220000_create_widget_preferences.sql</span></li>
+        <li><span class="path">supabase/migrations/20260822170000_relationship_widget_themes.sql</span></li>
+        <li><span class="path">supabase/migrations/20260902100000_widget_privacy_overrides.sql</span></li>
+      </ul>
+    </section>
+
+    <!-- TESTING -->
+    <section id="testing">
+      <h2>14. Testing &amp; Verification</h2>
+
+      <h3>Commands</h3>
+      <div class="card">
+        <pre style="color:var(--blue);font-size:0.85rem;overflow-x:auto"><code>flutter run
+flutter test test/core/widget_moment_selector_test.dart
+flutter test test/features/widget_preferences_test.dart
+flutter test test/core/deep_link_mapper_test.dart
+adb logcat -s MomentSync</code></pre>
+      </div>
+
+      <h3>Test coverage</h3>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Tests</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Widget moment selector</td>
+            <td><code>test/core/widget_moment_selector_test.dart</code> (2 tests)</td>
+            <td><span class="badge badge-done">Covered</span></td>
+          </tr>
+          <tr>
+            <td>Widget preferences entity</td>
+            <td><code>test/features/widget_preferences_test.dart</code> (10 tests)</td>
+            <td><span class="badge badge-done">Covered</span></td>
+          </tr>
+          <tr>
+            <td>Deep link mapper (widget ping/react)</td>
+            <td><code>test/core/deep_link_mapper_test.dart</code></td>
+            <td><span class="badge badge-done">Covered</span></td>
+          </tr>
+          <tr>
+            <td>HomeWidgetSyncService</td>
+            <td>—</td>
+            <td><span class="badge badge-pending">Not covered</span></td>
+          </tr>
+          <tr>
+            <td>Android Glance widget</td>
+            <td>—</td>
+            <td><span class="badge badge-pending">Not covered</span></td>
+          </tr>
+          <tr>
+            <td>Home / camera UI</td>
+            <td>—</td>
+            <td><span class="badge badge-pending">Not covered</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Device testing notes</h3>
+      <ul>
+        <li>After native Kotlin changes: <strong>remove and re-add</strong> the home screen widget</li>
+        <li>Tap the <strong>photo</strong> on widget (not Reveal chip) to open moment in app</li>
+        <li>Reveal chip shows 3s preview — does <strong>not</strong> mark moment as read</li>
+        <li>On Oppo/OnePlus/Xiaomi: background sync is backup when FCM is delayed</li>
+      </ul>
+    </section>
+
+    <!-- USER FLOWS -->
+    <section id="flows">
+      <h2>15. User Journey Flows</h2>
+
+      <h3>Flow A — Friend sends you a moment → Widget</h3>
+      <div class="card">
+        <div class="flow">
+          <span class="flow-step">Friend captures &amp; sends</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Supabase insert + recipient row</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">FCM / Realtime / WorkManager</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Native downloads image</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Widget shows ● Sender</span>
+        </div>
+      </div>
+
+      <h3>Flow B — You view moment → Widget clears</h3>
+      <div class="card">
+        <div class="flow">
+          <span class="flow-step">Tap widget photo</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">App opens moment detail</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">onMomentViewed + read cache</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">HomeWidgetSyncService.sync()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Next unread OR empty state</span>
+        </div>
+      </div>
+
+      <h3>Flow C — All caught up → Empty state</h3>
+      <div class="card">
+        <div class="flow">
+          <span class="flow-step">No unseen moments</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">clearWidget() on native</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">WidgetEmptyStateImages picks art</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Tap → moment://camera</span>
+        </div>
+      </div>
+
+      <h3>Flow D — Privacy full mode + Reveal</h3>
+      <div class="card">
+        <div class="flow">
+          <span class="flow-step">Widget shows blurred photo</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Tap "Reveal" chip</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">WidgetRevealActivity 3s</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Does NOT mark read</span>
+        </div>
+        <p style="margin-top:0.75rem;margin-bottom:0">To mark read: tap the <strong>photo area</strong> to open moment in app.</p>
+      </div>
+
+      <h3>Flow E — Home camera screen</h3>
+      <div class="card">
+        <div class="flow">
+          <span class="flow-step">Live viewfinder</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Shutter / Gallery / Flip</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">Send to friends</span>
+        </div>
+        <p style="margin-top:0.75rem;margin-bottom:0">
+          Swipe <strong>up</strong> → Memories overlay &nbsp;|&nbsp;
+          Tap <strong>History</strong> → moment deck sheet &nbsp;|&nbsp;
+          Bell icon → Notifications
+        </p>
+      </div>
+    </section>
+
+    <!-- API -->
+    <section id="api">
+      <h2>16. Flutter ↔ Android Method Channel</h2>
+      <p>Channel: <code>app.moment/widget</code> — implemented in <span class="path">WidgetBridgePlugin.kt</span></p>
+
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Direction</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>updateWidget</code></td><td>Flutter → Native</td><td>Push single moment + metadata to widget queue</td></tr>
+          <tr><td><code>pushIncomingMoment</code></td><td>Flutter → Native</td><td>Realtime incoming moment (optimistic)</td></tr>
+          <tr><td><code>syncPreferences</code></td><td>Flutter → Native</td><td>Theme, privacy, display options</td></tr>
+          <tr><td><code>readLocalPreferences</code></td><td>Flutter ← Native</td><td>Read cached widget prefs from device</td></tr>
+          <tr><td><code>clearWidget</code></td><td>Flutter → Native</td><td>Clear moment → show empty state</td></tr>
+          <tr><td><code>markMomentViewed</code></td><td>Flutter → Native</td><td>Clear display when moment viewed</td></tr>
+          <tr><td><code>saveWidgetSyncSession</code></td><td>Flutter → Native</td><td>Persist Supabase tokens for background sync</td></tr>
+          <tr><td><code>clearWidgetSyncSession</code></td><td>Flutter → Native</td><td>Logout — stop background sync</td></tr>
+          <tr><td><code>isPinWidgetSupported</code></td><td>Flutter ← Native</td><td>Check pin-widget API availability</td></tr>
+          <tr><td><code>requestPinWidget</code></td><td>Flutter → Native</td><td>Pin widget to home screen</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Background sync (app killed)</h3>
+      <p><span class="path">WidgetBackgroundSyncWorker.kt</span> + <span class="path">WidgetSyncScheduler.kt</span></p>
+      <ul>
+        <li><strong>Periodic:</strong> every 15 minutes via WorkManager (<code>moment_widget_periodic_sync</code>)</li>
+        <li><strong>Backup:</strong> one-shot 8 seconds after login (<code>moment_widget_backup_sync</code>)</li>
+        <li>Worker calls <code>WidgetSupabaseSync.sync()</code> — fetches <strong>unseen only</strong>, clears widget if none</li>
+      </ul>
+    </section>
+
+    <!-- DEEP LINKS -->
+    <section id="deeplinks">
+      <h2>17. Deep Links Reference</h2>
+      <table>
+        <thead>
+          <tr><th>URI</th><th>Triggered from</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>moment://camera</code></td>
+            <td>Empty widget tap</td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td><code>moment://moment/{id}</code></td>
+            <td>Widget photo tap</td>
+            <td><span class="badge badge-done">Working</span></td>
+          </tr>
+          <tr>
+            <td><code>moment://widget/react/{id}</code></td>
+            <td>Widget reaction button</td>
+            <td><span class="badge badge-partial">Flutter only — no widget UI</span></td>
+          </tr>
+          <tr>
+            <td><code>moment://widget/ping/{id}</code></td>
+            <td>Widget ping button</td>
+            <td><span class="badge badge-partial">Flutter only — no widget UI</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CHANGELOG -->
+    <section id="changelog">
+      <h2>18. This Session — What We Built &amp; Changed</h2>
+      <p>Everything implemented/changed in the recent development sprint:</p>
+
+      <table>
+        <thead>
+          <tr><th>#</th><th>Change</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Smart unread widget — show newest unread only, no read fallback</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>2</td><td>Widget advances / clears after viewing moment in app</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>3</td><td>Empty state when no moments or all seen</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>4</td><td>Time-of-day empty art: morning, afternoon, night</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>5</td><td>Per-sender privacy overrides + reveal activity + unlock receiver</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>6</td><td>Removed old preview timer / stack card system</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>7</td><td>Removed "Widget setup" from Settings (kept Customize + Privacy)</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>8</td><td>Home screen → camera-first with live viewfinder</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>9</td><td>Removed "Memories" text + up arrow (swipe up still works)</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>10</td><td>Top-right icon → notifications bell (was chat bubble)</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>11</td><td>Custom gallery + camera icons on capture bar (white PNGs, 52×52)</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>12</td><td>WidgetSupabaseSync — unseen only, clear on all caught up</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>13</td><td>Supabase migration: privacy_overrides jsonb</td><td><span class="badge badge-done">Done</span></td></tr>
+          <tr><td>14</td><td>Widget reaction buttons on home screen widget</td><td><span class="badge badge-pending">Pending</span></td></tr>
+          <tr><td>15</td><td>Lock-screen privacy enforcement in Glance</td><td><span class="badge badge-pending">Pending</span></td></tr>
+          <tr><td>16</td><td>iOS WidgetKit widget</td><td><span class="badge badge-pending">Not started</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      <p>Moment E2E Status — generated from codebase review and implementation session.</p>
+      <p>Open this file in any browser: <code>docs/moment-e2e-status.html</code></p>
+    </footer>
+
+  </div>
+</body>
+</html>

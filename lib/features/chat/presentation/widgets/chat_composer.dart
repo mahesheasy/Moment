@@ -64,10 +64,10 @@ class _ChatComposerState extends State<ChatComposer> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: ChatTheme.headerBackground,
+        color: ChatTheme.headerBackground(context),
         border: Border(
           top: BorderSide(
-            color: ChatTheme.divider.withValues(alpha: isDark ? 1 : 0.6),
+            color: ChatTheme.divider(context).withValues(alpha: isDark ? 1 : 0.6),
           ),
         ),
       ),
@@ -80,7 +80,7 @@ class _ChatComposerState extends State<ChatComposer> {
               onPressed: widget.onPickImage,
               icon: Icon(
                 Icons.image_outlined,
-                color: ChatTheme.secondaryText(isDark),
+                color: ChatTheme.secondaryText(context),
                 size: 22,
               ),
               padding: EdgeInsets.zero,
@@ -91,7 +91,7 @@ class _ChatComposerState extends State<ChatComposer> {
               child: Container(
                 constraints: const BoxConstraints(minHeight: 40),
                 decoration: BoxDecoration(
-                  color: ChatTheme.inputBackground,
+                  color: ChatTheme.inputBackground(context),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: TextField(
@@ -102,7 +102,7 @@ class _ChatComposerState extends State<ChatComposer> {
                   textCapitalization: TextCapitalization.sentences,
                   style: TextStyle(
                     fontFamily: AppTypography.fontFamily,
-                    color: ChatTheme.primaryText(isDark),
+                    color: ChatTheme.primaryText(context),
                     fontSize: 16,
                     height: 1.3,
                   ),
@@ -110,7 +110,7 @@ class _ChatComposerState extends State<ChatComposer> {
                     hintText: 'Message',
                     hintStyle: TextStyle(
                       fontFamily: AppTypography.fontFamily,
-                      color: ChatTheme.secondaryText(isDark),
+                      color: ChatTheme.secondaryText(context),
                       fontSize: 16,
                     ),
                     border: InputBorder.none,
@@ -125,7 +125,7 @@ class _ChatComposerState extends State<ChatComposer> {
             ),
             const SizedBox(width: 6),
             Material(
-              color: canSend ? ChatTheme.sentBubble : Colors.transparent,
+              color: canSend ? ChatTheme.sentBubble(context) : Colors.transparent,
               shape: const CircleBorder(),
               child: InkWell(
                 onTap: canSend ? widget.onSend : null,
@@ -146,7 +146,7 @@ class _ChatComposerState extends State<ChatComposer> {
                           size: 20,
                           color: canSend
                               ? Colors.white
-                              : ChatTheme.secondaryText(isDark)
+                              : ChatTheme.secondaryText(context)
                                   .withValues(alpha: 0.4),
                         ),
                 ),

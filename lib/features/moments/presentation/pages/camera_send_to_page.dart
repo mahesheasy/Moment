@@ -13,7 +13,7 @@ import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/circles/domain/entities/circle.dart';
 import 'package:moment/core/widgets/moment_hero_tags.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
-import 'package:moment/features/moments/presentation/pages/camera_sent_page.dart';
+import 'package:moment/features/moments/presentation/utils/camera_flow_navigation.dart';
 import 'package:moment/features/moments/presentation/widgets/camera_chrome.dart';
 
 class CameraSendToPage extends StatelessWidget {
@@ -27,29 +27,11 @@ class CameraSendToPage extends StatelessWidget {
           previous.errorMessage != current.errorMessage,
       listener: (context, state) {
         if (state.status == CameraStatus.success) {
-          final cubit = context.read<CameraCubit>();
-          final navigator = Navigator.of(context);
+          final label = state.sentToLabel;
+          final messenger = ScaffoldMessenger.of(context);
+          exitCameraFlowToHome(context);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            navigator.push(
-              PageRouteBuilder<void>(
-                opaque: true,
-                transitionDuration: const Duration(milliseconds: 420),
-                reverseTransitionDuration: const Duration(milliseconds: 320),
-                pageBuilder: (_, _, _) => BlocProvider.value(
-                  value: cubit,
-                  child: const CameraSentPage(),
-                ),
-                transitionsBuilder: (_, animation, _, child) {
-                  return FadeTransition(
-                    opacity: CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    ),
-                    child: child,
-                  );
-                },
-              ),
-            );
+            messenger.showSnackBar(SnackBar(content: Text(label)));
           });
         }
         if (state.errorMessage != null &&

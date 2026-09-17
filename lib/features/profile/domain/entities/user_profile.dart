@@ -8,6 +8,7 @@ class UserProfile extends Equatable {
     this.avatarUrl,
     this.bio,
     this.createdAt,
+    this.lastSeenAt,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class UserProfile extends Equatable {
   final String? avatarUrl;
   final String? bio;
   final DateTime? createdAt;
+  final DateTime? lastSeenAt;
 
   UserProfile copyWith({
     String? username,
@@ -23,6 +25,7 @@ class UserProfile extends Equatable {
     String? avatarUrl,
     String? bio,
     DateTime? createdAt,
+    DateTime? lastSeenAt,
   }) {
     return UserProfile(
       id: id,
@@ -31,11 +34,20 @@ class UserProfile extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       bio: bio ?? this.bio,
       createdAt: createdAt ?? this.createdAt,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
     );
   }
 
   @override
-  List<Object?> get props => [id, username, displayName, avatarUrl, bio, createdAt];
+  List<Object?> get props => [
+    id,
+    username,
+    displayName,
+    avatarUrl,
+    bio,
+    createdAt,
+    lastSeenAt,
+  ];
 }
 
 class ProfileUpdate extends Equatable {

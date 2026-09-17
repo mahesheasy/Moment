@@ -76,6 +76,8 @@
 	<string>Moment needs photo library access to share moments from your gallery.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Moment uses your contacts to help you invite friends.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Moment uses your location to tag moments with where you are.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Moment sends notifications when friends share moments with you.</string>
 	<key>UILaunchStoryboardName</key>

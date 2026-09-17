@@ -2,6 +2,7 @@ import 'package:moment/core/config/app_features.dart';
 import 'package:moment/core/result/result.dart';
 import 'package:moment/core/widget/android_widget_bridge.dart';
 import 'package:moment/core/widget/widget_display_resolver.dart';
+import 'package:moment/core/widget/widget_read_cache.dart';
 import 'package:moment/features/circles/domain/repositories/circle_repository.dart';
 import 'package:moment/features/moments/domain/entities/moment.dart';
 import 'package:moment/features/moments/domain/repositories/moment_repository.dart';
@@ -17,6 +18,7 @@ class HomeWidgetSyncService {
     this._widgetPreferences,
     this._circles,
     this._localCache,
+    this._readCache,
   );
 
   final MomentRepository _moments;
@@ -24,8 +26,16 @@ class HomeWidgetSyncService {
   final WidgetPreferencesRepository _widgetPreferences;
   final CircleRepository _circles;
   final WidgetPreferencesLocalCache _localCache;
+  final WidgetReadCache _readCache;
 
   static int _syncGeneration = 0;
+
+  /// Optimistically mark viewed, then recalculate (empty state when all caught up).
+  Future<void> onMomentViewed(String momentId) async {
+    await _readCache.markRead(momentId);
+    await _widgetBridge.markMomentViewedOnDevice(momentId);
+    await sync();
+  }
 
   Future<void> sync({bool promoteLatest = false}) async {
     final generation = ++_syncGeneration;
@@ -56,39 +66,19 @@ class HomeWidgetSyncService {
       streakCount: streakCount,
     );
 
-    final momentsResult = await _moments.getWidgetMoments(preferences);
+    final selectionResult = await _moments.getWidgetDisplayMoment(preferences);
     if (generation != _syncGeneration) return;
 
-    switch (momentsResult) {
-      case Success(:final value) when value.isNotEmpty:
-        final titles = <String, String>{};
-        for (final moment in value) {
-          final display = await resolveWidgetDisplay(
-            preferences: preferences,
-            moment: moment,
-            circles: _circles,
-          );
-          titles[moment.id] = display.headerTitle;
-        }
-        if (generation != _syncGeneration) return;
-        await _widgetBridge.syncReceivedMoments(
-          moments: value,
+    switch (selectionResult) {
+      case Success(:final value) when value.moment != null:
+        await pushMoment(
+          moment: value.moment!,
           preferences: preferences,
-          headerTitles: titles,
-          headerEmoji: preferences.theme.emoji,
-          showLatest: promoteLatest,
+          isUnread: value.isUnread,
           syncGeneration: generation,
         );
       case Success():
-        final fallback = await _moments.getWidgetMoment(preferences);
-        if (generation != _syncGeneration) return;
-        if (fallback case Success(:final value?)) {
-          await pushMoment(
-            moment: value,
-            preferences: preferences,
-            syncGeneration: generation,
-          );
-        }
+        await _widgetBridge.clear();
       case Failed():
         break;
     }
@@ -97,6 +87,7 @@ class HomeWidgetSyncService {
   Future<void> pushMoment({
     required Moment moment,
     required WidgetPreferences preferences,
+    bool isUnread = true,
     int syncGeneration = 0,
   }) async {
     final display = await resolveWidgetDisplay(
@@ -109,6 +100,7 @@ class HomeWidgetSyncService {
       preferences: preferences,
       headerTitle: display.headerTitle,
       headerEmoji: display.headerEmoji,
+      isUnread: isUnread,
       syncGeneration: syncGeneration,
     );
   }

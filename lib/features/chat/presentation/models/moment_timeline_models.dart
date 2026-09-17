@@ -46,6 +46,8 @@ class MomentTimelineEntry extends Equatable {
     this.replyPreview,
     this.isDeleted = false,
     this.isRead = false,
+    this.isStarred = false,
+    this.isEdited = false,
   });
 
   final String id;
@@ -63,6 +65,8 @@ class MomentTimelineEntry extends Equatable {
   final MomentReplyPreview? replyPreview;
   final bool isDeleted;
   final bool isRead;
+  final bool isStarred;
+  final bool isEdited;
 
   bool get hasMedia =>
       kind == MomentTimelineKind.media || kind == MomentTimelineKind.photo;
@@ -84,6 +88,8 @@ class MomentTimelineEntry extends Equatable {
         replyPreview,
         isDeleted,
         isRead,
+        isStarred,
+        isEdited,
       ];
 }
 

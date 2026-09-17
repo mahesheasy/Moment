@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:moment/core/errors/failures.dart';
 import 'package:moment/core/errors/postgrest_mapper.dart' as pg;
+import 'package:moment/core/utils/timestamp_parser.dart';
 import 'package:moment/features/profile/data/avatar_url_resolver.dart';
 import 'package:moment/features/profile/data/models/profile_model.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
@@ -14,10 +15,38 @@ class ProfileRemoteDataSource {
   final AvatarUrlResolver _avatarResolver;
   static const _avatarsBucket = 'avatars';
 
+  Future<void> touchLastSeen() async {
+    await _client.rpc<void>('touch_last_seen', params: const {});
+  }
+
+  Future<DateTime?> fetchLastSeen(String userId) async {
+    final data = await _client
+        .from('profiles')
+        .select('last_seen_at')
+        .eq('id', userId)
+        .maybeSingle();
+    if (data == null) return null;
+    return parseUtcTimestamp(data['last_seen_at']);
+  }
+
+  Stream<DateTime?> watchLastSeen(String userId) {
+    return _client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .map((rows) {
+          if (rows.isEmpty) return null;
+          return parseUtcTimestamp(rows.first['last_seen_at']);
+        })
+        .where((value) => value != null);
+  }
+
   Future<UserProfile> getProfile(String userId) async {
     final data = await _client
         .from('profiles')
-        .select()
+        .select(
+          'id, username, display_name, avatar_url, bio, created_at, last_seen_at',
+        )
         .eq('id', userId)
         .single();
     return _mapProfile(Map<String, dynamic>.from(data));
@@ -91,12 +120,11 @@ class ProfileRemoteDataSource {
   }
 
   Future<bool> isUsernameAvailable(String username) async {
-    final data = await _client
-        .from('profiles')
-        .select('id')
-        .eq('username', username)
-        .maybeSingle();
-    return data == null;
+    final result = await _client.rpc<bool>(
+      'is_username_available',
+      params: {'candidate': username},
+    );
+    return result ?? false;
   }
 
   Failure mapPostgrestError(Object error) {

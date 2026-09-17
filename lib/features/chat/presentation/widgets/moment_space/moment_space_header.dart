@@ -1,43 +1,71 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/theme/app_icons.dart';
-import 'package:moment/core/theme/app_typography.dart';
+import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/core/widgets/moment_avatar.dart';
 import 'package:moment/core/widgets/moment_hero_tags.dart';
-import 'package:moment/core/theme/moment_theme.dart';
 import 'package:moment/features/chat/presentation/theme/chat_typography.dart';
 import 'package:moment/features/chat/presentation/theme/moment_space_theme.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
+import 'package:moment/features/profile/domain/presence_utils.dart';
 
 typedef MomentSpaceMenuCallback = void Function();
 
-class MomentSpaceHeader extends StatelessWidget {
+class MomentSpaceHeader extends StatefulWidget {
   const MomentSpaceHeader({
     required this.user,
     required this.showHero,
+    this.isTyping = false,
     this.onMenu,
     super.key,
   });
 
   final UserProfile user;
   final bool showHero;
+  final bool isTyping;
   final VoidCallback? onMenu;
 
   @override
+  State<MomentSpaceHeader> createState() => _MomentSpaceHeaderState();
+}
+
+class _MomentSpaceHeaderState extends State<MomentSpaceHeader> {
+  Timer? _presenceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _presenceTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final mc = context.mc;
     final top = MediaQuery.paddingOf(context).top;
-    final status = user.bio?.trim().isNotEmpty == true
-        ? user.bio!
-        : 'Good vibes only 🌿';
+    final isOnline = PresenceUtils.isOnline(widget.user.lastSeenAt);
+    final status = PresenceUtils.statusLabel(
+      isTyping: widget.isTyping,
+      lastSeenAt: widget.user.lastSeenAt,
+    );
 
     return Container(
       padding: EdgeInsets.fromLTRB(8, top + 4, 12, 12),
       decoration: BoxDecoration(
-        color: MomentSpaceTheme.background.withValues(alpha: 0.96),
+        color: mc.background.withValues(alpha: 0.96),
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: mc.border.withValues(alpha: 0.55),
           ),
         ),
       ),
@@ -48,19 +76,20 @@ class MomentSpaceHeader extends StatelessWidget {
             icon: Icon(
               AppIcons.back,
               size: 22,
-              color: MomentSpaceTheme.textPrimary(context),
+              color: mc.textPrimary,
             ),
             onPressed: () => context.pop(),
           ),
           Expanded(
             child: InkWell(
-              onTap: () => context.push(AppRoutes.friend(user.id)),
+              onTap: () => context.push(AppRoutes.friend(widget.user.id)),
               borderRadius: BorderRadius.circular(12),
               child: Row(
                 children: [
-                  _AvatarWithOnline(
-                    user: user,
-                    showHero: showHero,
+                  _AvatarWithPresence(
+                    user: widget.user,
+                    showHero: widget.showHero,
+                    isOnline: isOnline,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -71,11 +100,11 @@ class MomentSpaceHeader extends StatelessWidget {
                           children: [
                             Flexible(
                               child: Text(
-                                user.displayName,
+                                widget.user.displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: ChatTypography.headerName(
-                                  color: MomentSpaceTheme.textPrimary(context),
+                                  color: mc.textPrimary,
                                 ),
                               ),
                             ),
@@ -83,7 +112,7 @@ class MomentSpaceHeader extends StatelessWidget {
                             Icon(
                               Icons.auto_awesome_rounded,
                               size: 12,
-                              color: context.mc.accent,
+                              color: mc.accent,
                             ),
                           ],
                         ),
@@ -92,7 +121,11 @@ class MomentSpaceHeader extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: ChatTypography.headerStatus(
-                            color: MomentSpaceTheme.textSecondary(context),
+                            color: widget.isTyping
+                                ? mc.accent
+                                : isOnline
+                                ? MomentSpaceTheme.onlineGreen
+                                : mc.textSecondary,
                           ),
                         ),
                       ],
@@ -102,10 +135,10 @@ class MomentSpaceHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (onMenu != null)
+          if (widget.onMenu != null)
             _HeaderIconButton(
               icon: Icons.more_vert_rounded,
-              onTap: onMenu,
+              onTap: widget.onMenu,
             ),
         ],
       ),
@@ -113,14 +146,20 @@ class MomentSpaceHeader extends StatelessWidget {
   }
 }
 
-class _AvatarWithOnline extends StatelessWidget {
-  const _AvatarWithOnline({required this.user, required this.showHero});
+class _AvatarWithPresence extends StatelessWidget {
+  const _AvatarWithPresence({
+    required this.user,
+    required this.showHero,
+    required this.isOnline,
+  });
 
   final UserProfile user;
   final bool showHero;
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
+    final mc = context.mc;
     final avatar = Stack(
       clipBehavior: Clip.none,
       children: [
@@ -136,10 +175,12 @@ class _AvatarWithOnline extends StatelessWidget {
             width: 10,
             height: 10,
             decoration: BoxDecoration(
-              color: MomentSpaceTheme.onlineGreen,
+              color: isOnline
+                  ? MomentSpaceTheme.onlineGreen
+                  : mc.textTertiary.withValues(alpha: 0.65),
               shape: BoxShape.circle,
               border: Border.all(
-                color: MomentSpaceTheme.background,
+                color: mc.background,
                 width: 2,
               ),
             ),
@@ -179,7 +220,7 @@ class _HeaderIconButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 16,
-              color: MomentSpaceTheme.textSecondary(context),
+              color: context.mc.textSecondary,
             ),
           ),
         ),

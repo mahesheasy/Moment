@@ -1,3 +1,4 @@
+import 'package:moment/core/utils/timestamp_parser.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
 
 class ProfileModel {
@@ -8,19 +9,18 @@ class ProfileModel {
     this.avatarUrl,
     this.bio,
     this.createdAt,
+    this.lastSeenAt,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
-    final createdAtRaw = json['created_at'];
     return ProfileModel(
       id: json['id'] as String,
       username: json['username'] as String,
       displayName: json['display_name'] as String,
       avatarUrl: json['avatar_url'] as String?,
       bio: json['bio'] as String?,
-      createdAt: createdAtRaw is String
-          ? DateTime.parse(createdAtRaw).toUtc()
-          : null,
+      createdAt: parseUtcTimestamp(json['created_at']),
+      lastSeenAt: parseUtcTimestamp(json['last_seen_at']),
     );
   }
 
@@ -30,6 +30,7 @@ class ProfileModel {
   final String? avatarUrl;
   final String? bio;
   final DateTime? createdAt;
+  final DateTime? lastSeenAt;
 
   UserProfile toEntity() {
     return UserProfile(
@@ -39,6 +40,7 @@ class ProfileModel {
       avatarUrl: avatarUrl,
       bio: bio,
       createdAt: createdAt,
+      lastSeenAt: lastSeenAt,
     );
   }
 }

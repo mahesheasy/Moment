@@ -71,23 +71,123 @@ class FriendAddPillButton extends StatelessWidget {
   }
 }
 
+class FriendsQrConnectRow extends StatelessWidget {
+  const FriendsQrConnectRow({
+    required this.onScanTap,
+    required this.onMyQrTap,
+    super.key,
+  });
+
+  final VoidCallback onScanTap;
+  final VoidCallback onMyQrTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QrConnectButton(
+            icon: Icons.qr_code_scanner_rounded,
+            label: 'Scan QR',
+            emphasized: true,
+            onTap: onScanTap,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: _QrConnectButton(
+            icon: Icons.qr_code_2_rounded,
+            label: 'My QR',
+            onTap: onMyQrTap,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QrConnectButton extends StatelessWidget {
+  const _QrConnectButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = emphasized
+        ? AppColors.violet.withValues(alpha: 0.18)
+        : AppColors.surfaceElevatedDark;
+    final border = emphasized
+        ? AppColors.violet.withValues(alpha: 0.45)
+        : AppColors.borderDark;
+    final foreground = emphasized
+        ? AppColors.textPrimaryDark
+        : AppColors.textSecondaryDark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: foreground),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                label,
+                style: SettingsType.caption(foreground).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class FriendsFromOtherAppsRow extends StatelessWidget {
-  const FriendsFromOtherAppsRow({super.key, this.username});
+  const FriendsFromOtherAppsRow({
+    super.key,
+    this.username,
+    this.userId,
+    this.compact = false,
+  });
 
   final String? username;
+  final String? userId;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Find friends from other apps',
-          style: SettingsType.title(
-            AppColors.textPrimaryDark,
-          ).copyWith(fontWeight: FontWeight.w700, fontSize: 16),
-        ),
-        const SizedBox(height: AppSpacing.lg),
+        if (!compact)
+          Text(
+            'Find friends from other apps',
+            style: SettingsType.title(
+              AppColors.textPrimaryDark,
+            ).copyWith(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+        SizedBox(height: compact ? AppSpacing.sm : AppSpacing.lg),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -96,6 +196,7 @@ class FriendsFromOtherAppsRow extends StatelessWidget {
               onTap: () => FriendInvite.send(
                 channel: FriendInviteChannel.instagram,
                 username: username,
+                userId: userId,
               ),
               child: const _InstagramGlyph(),
             ),
@@ -104,6 +205,7 @@ class FriendsFromOtherAppsRow extends StatelessWidget {
               onTap: () => FriendInvite.send(
                 channel: FriendInviteChannel.snapchat,
                 username: username,
+                userId: userId,
               ),
               child: const _SnapGlyph(),
             ),
@@ -112,6 +214,7 @@ class FriendsFromOtherAppsRow extends StatelessWidget {
               onTap: () => FriendInvite.send(
                 channel: FriendInviteChannel.messages,
                 username: username,
+                userId: userId,
               ),
               child: const _MessagesGlyph(),
             ),
@@ -120,6 +223,7 @@ class FriendsFromOtherAppsRow extends StatelessWidget {
               onTap: () => FriendInvite.send(
                 channel: FriendInviteChannel.others,
                 username: username,
+                userId: userId,
               ),
               child: Container(
                 width: 64,
@@ -183,7 +287,7 @@ class FriendsUsernameTipCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Friends can search @$username',
+                    'Scan QR or search @$username',
                     style: SettingsType.body(AppColors.textTertiaryDark),
                   ),
                 ],
@@ -327,13 +431,14 @@ class _MessagesGlyph extends StatelessWidget {
   }
 }
 
-class FriendsContactsSection extends StatelessWidget {
+class FriendsContactsSection extends StatefulWidget {
   const FriendsContactsSection({
     required this.contacts,
     required this.contactsLoaded,
     required this.permissionDenied,
     required this.onRequestAccess,
     this.username,
+    this.previewCount = 4,
     super.key,
   });
 
@@ -342,9 +447,22 @@ class FriendsContactsSection extends StatelessWidget {
   final bool permissionDenied;
   final VoidCallback onRequestAccess;
   final String? username;
+  final int previewCount;
+
+  @override
+  State<FriendsContactsSection> createState() => _FriendsContactsSectionState();
+}
+
+class _FriendsContactsSectionState extends State<FriendsContactsSection> {
+  var _showAllContacts = false;
 
   @override
   Widget build(BuildContext context) {
+    final contacts = widget.contacts;
+    final contactsLoaded = widget.contactsLoaded;
+    final permissionDenied = widget.permissionDenied;
+    final username = widget.username;
+    final previewCount = widget.previewCount;
     if (!contactsLoaded) {
       return const SizedBox.shrink();
     }
@@ -357,7 +475,7 @@ class FriendsContactsSection extends StatelessWidget {
             'From your contacts',
             style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
               fontWeight: FontWeight.w700,
-              fontSize: 16,
+              fontSize: 15,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -368,7 +486,7 @@ class FriendsContactsSection extends StatelessWidget {
               border: Border.all(color: AppColors.borderDark),
             ),
             child: ListTile(
-              onTap: onRequestAccess,
+              onTap: widget.onRequestAccess,
               leading: const Icon(Icons.contacts_rounded, color: Colors.white),
               title: Text(
                 'Allow contacts access',
@@ -391,65 +509,121 @@ class FriendsContactsSection extends StatelessWidget {
 
     if (contacts.isEmpty) return const SizedBox.shrink();
 
+    final visibleContacts = _showAllContacts
+        ? contacts
+        : contacts.take(previewCount).toList();
+    final hiddenCount = contacts.length - previewCount;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'From your contacts',
           style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        ...contacts.take(12).map(
-          (contact) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderDark),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Column(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.surfaceElevatedDark,
-                  child: Text(
-                    contact.displayName.characters.first.toUpperCase(),
-                    style: SettingsType.title(AppColors.textPrimaryDark)
-                        .copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        contact.displayName,
-                        style: SettingsType.title(AppColors.textPrimaryDark)
-                            .copyWith(fontWeight: FontWeight.w600, fontSize: 15),
-                      ),
-                      if (contact.phone != null)
-                        Text(
-                          contact.phone!,
-                          style: SettingsType.caption(
-                            AppColors.textTertiaryDark,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                FriendAddPillButton(
-                  label: 'Invite',
-                  onTap: () => FriendInvite.send(
-                    channel: contact.phone != null
-                        ? FriendInviteChannel.messages
-                        : FriendInviteChannel.others,
+                for (var i = 0; i < visibleContacts.length; i++) ...[
+                  if (i > 0) Divider(height: 1, color: AppColors.borderDark),
+                  _ContactInviteRow(
+                    contact: visibleContacts[i],
                     username: username,
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
+        if (!_showAllContacts && hiddenCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: () => setState(() => _showAllContacts = true),
+                child: Text(
+                  'Show all $hiddenCount contacts',
+                  style: SettingsType.caption(AppColors.violet).copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+}
+
+class _ContactInviteRow extends StatelessWidget {
+  const _ContactInviteRow({
+    required this.contact,
+    required this.username,
+  });
+
+  final ContactSuggestion contact;
+  final String? username;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.surfaceElevatedDark,
+            child: Text(
+              contact.displayName.characters.first.toUpperCase(),
+              style: SettingsType.title(AppColors.textPrimaryDark)
+                  .copyWith(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contact.displayName,
+                  style: SettingsType.title(AppColors.textPrimaryDark)
+                      .copyWith(fontWeight: FontWeight.w600, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (contact.phone != null)
+                  Text(
+                    contact.phone!,
+                    style: SettingsType.caption(AppColors.textTertiaryDark),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          FriendAddPillButton(
+            label: 'Invite',
+            onTap: () => FriendInvite.send(
+              channel: contact.phone != null
+                  ? FriendInviteChannel.messages
+                  : FriendInviteChannel.others,
+              username: username,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -63,6 +63,7 @@ object WidgetMediaDownloader {
                 hasAvatar = !avatarPath.isNullOrBlank(),
             )
             runBlocking { MomentWidgetUpdater.updatePreservingView(appContext) }
+            WidgetRenderLatency.onPhotoRendered(momentId)
         }
     }
 }

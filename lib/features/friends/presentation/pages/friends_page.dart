@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moment/app/di/injection.dart';
+import 'package:moment/app/router/app_routes.dart';
 import 'package:moment/core/theme/app_colors.dart';
 import 'package:moment/core/theme/app_icons.dart';
 import 'package:moment/core/theme/app_spacing.dart';
@@ -15,7 +16,9 @@ import 'package:moment/core/widgets/moment_sheet_dialog.dart';
 import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/friends/domain/entities/friend_entities.dart';
 import 'package:moment/features/friends/presentation/cubit/friends_cubit.dart';
+import 'package:moment/features/friends/presentation/widgets/friend_qr_sheet.dart';
 import 'package:moment/features/friends/presentation/widgets/friends_discovery.dart';
+import 'package:moment/features/profile/domain/entities/user_profile.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
 enum _FriendsTab { all, requests, suggested }
@@ -137,6 +140,32 @@ class _FriendsViewState extends State<_FriendsView> {
     });
   }
 
+  void _openScanQr() {
+    context.push(AppRoutes.friendsScan);
+  }
+
+  void _openMyQr(FriendsState state) {
+    final id = state.myUserId;
+    final username = state.myUsername;
+    final displayName = state.myDisplayName;
+    if (id == null || username == null || displayName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile is still loading. Try again.')),
+      );
+      return;
+    }
+
+    showFriendQrSheet(
+      context,
+      profile: UserProfile(
+        id: id,
+        username: username,
+        displayName: displayName,
+        avatarUrl: state.myAvatarUrl,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<FriendsCubit, FriendsState>(
@@ -186,6 +215,18 @@ class _FriendsViewState extends State<_FriendsView> {
                         ),
                       ),
                       if (!isSearching) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.lg,
+                            AppSpacing.md,
+                            AppSpacing.lg,
+                            0,
+                          ),
+                          child: FriendsQrConnectRow(
+                            onScanTap: _openScanQr,
+                            onMyQrTap: () => _openMyQr(state),
+                          ),
+                        ),
                         SizedBox(height: AppSpacing.lg),
                         _FriendsTabBar(
                           tab: _tab,
@@ -564,42 +605,6 @@ class _AllFriendsTab extends StatelessWidget {
         AppSpacing.huge,
       ),
       children: [
-        FriendsFromOtherAppsRow(username: username),
-        SizedBox(height: AppSpacing.xl),
-        if (showUsernameTip && username != null && username.isNotEmpty) ...[
-          FriendsUsernameTipCard(username: username, onDismiss: onDismissTip),
-          SizedBox(height: AppSpacing.xxl),
-        ],
-        if (state.incoming.isNotEmpty) ...[
-          _SectionTitle(
-            title: 'Friend Requests',
-            showSeeAll: true,
-            onSeeAllTap: onSeeAllRequests,
-          ),
-          SizedBox(height: AppSpacing.sm),
-          ...state.incoming.take(3).map((r) => _IncomingRequestRow(request: r)),
-          SizedBox(height: AppSpacing.xxl),
-        ],
-        if (state.suggestions.isNotEmpty) ...[
-          _SectionTitle(
-            title: 'Suggestions',
-            showSeeAll: state.suggestions.length > 4,
-            onSeeAllTap: onSeeAllSuggested,
-          ),
-          SizedBox(height: AppSpacing.sm),
-          ...state.suggestions
-              .take(8)
-              .map((s) => _SuggestedListRow(suggestion: s)),
-          SizedBox(height: AppSpacing.xxl),
-        ],
-        FriendsContactsSection(
-          contacts: state.contacts,
-          contactsLoaded: state.contactsLoaded,
-          permissionDenied: state.contactsPermissionDenied,
-          username: username,
-          onRequestAccess: () => context.read<FriendsCubit>().loadContacts(),
-        ),
-        if (state.contacts.isNotEmpty) SizedBox(height: AppSpacing.xxl),
         _SectionTitle(
           title: 'Your friends',
           trailing: friends.isEmpty ? null : 'Sort by: $sortLabel',
@@ -609,7 +614,7 @@ class _AllFriendsTab extends StatelessWidget {
         SizedBox(height: AppSpacing.sm),
         if (friends.isEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xl),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
             child: Text(
               'Search by username to find people and grow your circle.',
               textAlign: TextAlign.center,
@@ -617,7 +622,98 @@ class _AllFriendsTab extends StatelessWidget {
             ),
           )
         else
-          ...friends.map((f) => _FriendListRow(friend: f)),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceDark,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderDark),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Column(
+                children: [
+                  for (var i = 0; i < friends.length; i++) ...[
+                    if (i > 0)
+                      Divider(height: 1, color: AppColors.borderDark),
+                    _FriendListRow(friend: friends[i]),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        SizedBox(height: AppSpacing.xxl),
+        const _AddFriendsDivider(),
+        SizedBox(height: AppSpacing.lg),
+        if (state.incoming.isNotEmpty) ...[
+          _SectionTitle(
+            title: 'Friend requests',
+            showSeeAll: state.incoming.length > 2,
+            onSeeAllTap: onSeeAllRequests,
+          ),
+          SizedBox(height: AppSpacing.sm),
+          ...state.incoming
+              .take(2)
+              .map((r) => _IncomingRequestRow(request: r)),
+          SizedBox(height: AppSpacing.xl),
+        ],
+        if (state.suggestions.isNotEmpty) ...[
+          _SectionTitle(
+            title: 'Suggestions',
+            showSeeAll: state.suggestions.length > 3,
+            onSeeAllTap: onSeeAllSuggested,
+          ),
+          SizedBox(height: AppSpacing.sm),
+          ...state.suggestions
+              .take(3)
+              .map((s) => _SuggestedListRow(suggestion: s)),
+          SizedBox(height: AppSpacing.xl),
+        ],
+        FriendsFromOtherAppsRow(
+          username: username,
+          userId: state.myUserId,
+          compact: true,
+        ),
+        if (showUsernameTip && username != null && username.isNotEmpty) ...[
+          SizedBox(height: AppSpacing.lg),
+          FriendsUsernameTipCard(username: username, onDismiss: onDismissTip),
+        ],
+        SizedBox(height: AppSpacing.lg),
+        FriendsContactsSection(
+          contacts: state.contacts,
+          contactsLoaded: state.contactsLoaded,
+          permissionDenied: state.contactsPermissionDenied,
+          username: username,
+          previewCount: 4,
+          onRequestAccess: () => context.read<FriendsCubit>().loadContacts(),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddFriendsDivider extends StatelessWidget {
+  const _AddFriendsDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(height: 1, color: AppColors.borderDark),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Text(
+            'Add friends',
+            style: SettingsType.caption(AppColors.textTertiaryDark).copyWith(
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(height: 1, color: AppColors.borderDark),
+        ),
       ],
     );
   }

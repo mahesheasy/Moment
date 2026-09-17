@@ -8,18 +8,16 @@ import kotlinx.coroutines.withContext
 
 object MomentWidgetUpdater {
     suspend fun update(context: Context, resetPreview: Boolean = false) {
-        if (resetPreview) {
-            val momentId =
-                WidgetMomentQueue.activeEntry(context)?.momentId
-                    ?: MomentWidgetDataStore.load(context).momentId
-            WidgetMediaPrivacyPreview.beginSession(context, momentId)
-        }
         refresh(context)
     }
 
     suspend fun updateIncomingMoment(context: Context, momentId: String) {
-        WidgetMediaPrivacyPreview.beginSession(context, momentId)
         refresh(context)
+        WidgetRenderLatency.onMetadataRendered(momentId)
+        val entry = WidgetMomentQueue.findEntry(context, momentId)
+        if (!entry?.imagePath.isNullOrBlank()) {
+            WidgetRenderLatency.onPhotoRendered(momentId)
+        }
     }
 
     suspend fun updatePreservingView(context: Context) {

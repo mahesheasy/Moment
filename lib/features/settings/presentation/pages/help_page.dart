@@ -25,22 +25,19 @@ class HelpPage extends StatelessWidget {
     ),
     _HelpTopic(
       question: 'What is Moment+?',
-      answer:
-          'Moment+ unlocks premium widgets, themes, unlimited memories, Time Travel+, and more customization.',
+      answer:'Moment+ unlocks premium widgets, themes, unlimited memories, Time Travel+, and more customization.',
       route: AppRoutes.premium,
       routeLabel: 'View Moment+',
     ),
     _HelpTopic(
       question: 'How do I block someone?',
-      answer:
-          'Open Friends, tap a friend, then choose Block from the menu. You can manage blocked users in Settings → Blocked users.',
+      answer:'Open Friends, tap a friend, then choose Block from the menu. You can manage blocked users in Settings → Blocked users.',
       route: AppRoutes.blockedUsers,
       routeLabel: 'Blocked users',
     ),
     _HelpTopic(
       question: 'How do widgets work?',
-      answer:
-          'Add the Moment widget to your home screen from Widget settings. Your latest unseen moment appears there in real time.',
+      answer:  'Add the Moment widget to your home screen from Widget settings. Your latest unseen moment appears there in real time.',
       route: AppRoutes.widgetCustomize,
       routeLabel: 'Widget settings',
     ),
@@ -53,7 +50,7 @@ class HelpPage extends StatelessWidget {
         title: 'Help',
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(AppIcons.back, size: 18),
+          icon: const Icon(AppIcons.back, size: 18),
           onPressed: () => context.pop(),
         ),
       ),

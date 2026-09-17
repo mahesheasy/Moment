@@ -179,7 +179,6 @@ class _HomeViewState extends State<_HomeView> {
                     onFlip: session.flip,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _MemoriesSwipeHandle(onOpen: _openMemories),
                   _HistoryHandle(onTap: () => _openHistory(context)),
                   SizedBox(height: 16 + bottomInset),
                 ],
@@ -187,43 +186,6 @@ class _HomeViewState extends State<_HomeView> {
             );
           },
         ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MemoriesSwipeHandle extends StatelessWidget {
-  const _MemoriesSwipeHandle({required this.onOpen});
-
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onOpen,
-      onVerticalDragEnd: (details) {
-        if ((details.primaryVelocity ?? 0) < -280) onOpen();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.keyboard_arrow_up_rounded,
-              color: Colors.white70,
-              size: 20,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Memories',
-              style: SettingsType.title(
-                Colors.white70,
-              ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-          ],
         ),
       ),
     );
@@ -293,28 +255,41 @@ class _FriendsPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push(AppRoutes.friends),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(AppIcons.circlesFilled, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              'Friends',
-              style: SettingsType.title(
-                Colors.white,
-              ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+    return BlocBuilder<FriendsCubit, FriendsState>(
+      builder: (context, state) {
+        final count = state.friends.length;
+
+        return GestureDetector(
+          onTap: () => context.push(AppRoutes.friends),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(999),
             ),
-          ],
-        ),
-      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(AppIcons.circlesFilled, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Friends',
+                  style: SettingsType.title(
+                    Colors.white,
+                  ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$count',
+                  style: SettingsType.title(
+                    Colors.white.withValues(alpha: 0.55),
+                  ).copyWith(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -344,9 +319,9 @@ class _MessagesButton extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.chat_bubble_outline_rounded,
+                    AppIcons.notifications,
                     color: Colors.white,
-                    size: 20,
+                    size: 22,
                   ),
                 ),
                 if (badge)
@@ -415,24 +390,25 @@ class _HomeCaptureBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 36),
+      padding: const EdgeInsets.symmetric(horizontal: 28),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
             onTap: onGallery,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                width: 44,
-                height: 44,
+                width: 52,
+                height: 52,
                 child: previewBytes == null
                     ? const ColoredBox(
                         color: Color(0xFF2A2A2A),
-                        child: Icon(
-                          AppIcons.gallery,
-                          color: Colors.white,
-                          size: 22,
+                        child: Center(
+                          child: _HomeBarIcon(
+                            asset: 'assets/images/home_gallery_icon.png',
+                            size: 34,
+                          ),
                         ),
                       )
                     : Image.memory(previewBytes!, fit: BoxFit.cover),
@@ -471,13 +447,47 @@ class _HomeCaptureBar extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onFlip,
-            child: const SizedBox(
-              width: 44,
-              height: 44,
-              child: Icon(AppIcons.flip, color: Colors.white, size: 28),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: const SizedBox(
+                width: 52,
+                height: 52,
+                child: ColoredBox(
+                  color: Color(0xFF2A2A2A),
+                  child: Center(
+                    child: _HomeBarIcon(
+                      asset: 'assets/images/home_camera_icon.png',
+                      size: 34,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HomeBarIcon extends StatelessWidget {
+  const _HomeBarIcon({required this.asset, this.size = 24});
+
+  final String asset;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => Icon(
+        asset.contains('gallery') ? AppIcons.gallery : AppIcons.flip,
+        color: Colors.white,
+        size: size,
       ),
     );
   }

@@ -14,7 +14,7 @@ class ChatEncryptionBanner extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TextStyle(
           fontFamily: AppTypography.fontFamily,
-          color: ChatTheme.tertiaryText.withValues(alpha: 0.85),
+          color: ChatTheme.tertiaryText(context).withValues(alpha: 0.85),
           fontSize: 12,
           fontWeight: FontWeight.w400,
           height: 1.4,

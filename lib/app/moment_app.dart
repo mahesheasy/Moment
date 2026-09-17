@@ -7,6 +7,7 @@ import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/lifecycle/app_lifecycle_cubit.dart';
 import 'package:moment/app/lifecycle/session_cubit.dart';
 import 'package:moment/core/constants/app_constants.dart';
+import 'package:moment/core/presence/profile_presence_service.dart';
 import 'package:moment/core/push/push_bridge.dart';
 import 'package:moment/core/push/push_registration_service.dart';
 import 'package:moment/core/theme/app_colors.dart';
@@ -46,6 +47,7 @@ class _MomentAppState extends State<MomentApp> {
     });
     _sessionSubscription = sl<SessionCubit>().stream.listen((state) {
       if (state.isAuthenticated) {
+        sl<ProfilePresenceService>().onAuthenticated();
         unawaited(sl<PushRegistrationService>().register());
         unawaited(_syncNotificationPreferences());
         sl<WidgetMomentStreamService>().start();
@@ -55,10 +57,12 @@ class _MomentAppState extends State<MomentApp> {
     });
     final session = sl<SessionCubit>().state;
     if (session.isAuthenticated) {
+      sl<ProfilePresenceService>().onAuthenticated();
       unawaited(sl<PushRegistrationService>().register());
       unawaited(_syncNotificationPreferences());
       sl<WidgetMomentStreamService>().start();
     }
+    sl<ProfilePresenceService>().start();
   }
 
   Future<void> _syncNotificationPreferences() async {

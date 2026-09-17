@@ -4,12 +4,6 @@ import 'package:moment/core/theme/moment_theme.dart';
 
 /// Visual tokens for the private Moments space (relationship timeline).
 abstract final class MomentSpaceTheme {
-  static const background = Color(0xFF0B0D14);
-  static const composerBarBackground = Color(0xFF0B0B0F);
-  static const composerPillBackground = Color(0xFF1A1A2E);
-  static const surface = Color(0xFF10121C);
-  static const surfaceElevated = Color(0xFF161A24);
-  static const timelineLine = Color(0xFF252A36);
   static const onlineGreen = Color(0xFF34C759);
   static const readBlue = Color(0xFF5AC8FA);
 
@@ -24,6 +18,39 @@ abstract final class MomentSpaceTheme {
   static const iconButtonSize = 30.0;
   static const composerHeight = 36.0;
   static const sendButtonSize = 36.0;
+
+  static Color background(BuildContext context) => context.mc.background;
+
+  static Color surface(BuildContext context) => context.mc.surface;
+
+  static Color surfaceElevated(BuildContext context) =>
+      context.mc.surfaceElevated;
+
+  static Color timelineLine(BuildContext context) =>
+      context.mc.border.withValues(alpha: 0.85);
+
+  static Color composerBarBackground(BuildContext context) =>
+      context.mc.background;
+
+  static Color composerPillFill(BuildContext context) => context.mc.surface;
+
+  static Color composerPillBackground(BuildContext context) =>
+      composerPillFill(context);
+
+  static Color composerPillBorder(BuildContext context) =>
+      context.mc.border.withValues(alpha: 0.9);
+
+  static Color composerPlusFill(BuildContext context) =>
+      context.mc.surfaceElevated;
+
+  static Color composerHint(BuildContext context) => context.mc.textTertiary;
+
+  static Color composerText(BuildContext context) => context.mc.textPrimary;
+
+  static Color composerIconMuted(BuildContext context) =>
+      context.mc.textSecondary;
+
+  static Color composerAccent(BuildContext context) => context.mc.accent;
 
   static Color border(BuildContext context) =>
       context.mc.border.withValues(alpha: 0.55);
@@ -54,7 +81,7 @@ abstract final class MomentSpaceTheme {
   }) {
     return BoxDecoration(
       gradient: gradient,
-      color: gradient == null ? surface : null,
+      color: gradient == null ? surface(context) : null,
       borderRadius: radius ?? BorderRadius.circular(cardRadius),
       border: Border.all(color: border(context)),
       boxShadow: cardShadow,
@@ -79,7 +106,7 @@ abstract final class MomentSpaceTheme {
       );
     }
     return BoxDecoration(
-      color: surfaceElevated.withValues(alpha: 0.85),
+      color: surfaceElevated(context).withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(pillRadius),
       border: Border.all(color: border(context)),
     );
@@ -87,7 +114,7 @@ abstract final class MomentSpaceTheme {
 
   static BoxDecoration iconButtonDecoration(BuildContext context) {
     return BoxDecoration(
-      color: surfaceElevated.withValues(alpha: 0.9),
+      color: surfaceElevated(context).withValues(alpha: 0.9),
       shape: BoxShape.circle,
       border: Border.all(color: border(context)),
     );
@@ -123,10 +150,10 @@ abstract final class MomentSpaceTheme {
 
   static BoxDecoration theirsBubbleDecoration(BuildContext context) {
     return BoxDecoration(
-      color: const Color(0xFF181C26),
+      color: surfaceElevated(context),
       borderRadius: messageRadiusTheirs,
       border: Border.all(
-        color: Colors.white.withValues(alpha: 0.07),
+        color: context.mc.border.withValues(alpha: 0.65),
       ),
     );
   }
@@ -136,17 +163,17 @@ abstract final class MomentSpaceTheme {
     required bool focused,
   }) {
     return BoxDecoration(
-      color: const Color(0xFF13161F),
+      color: surface(context),
       borderRadius: BorderRadius.circular(28),
       border: Border.all(
         color: focused
             ? context.mc.accent.withValues(alpha: 0.45)
-            : Colors.white.withValues(alpha: 0.08),
+            : context.mc.border.withValues(alpha: 0.75),
         width: focused ? 1.5 : 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.4),
+          color: Colors.black.withValues(alpha: 0.25),
           blurRadius: 28,
           offset: const Offset(0, 10),
         ),

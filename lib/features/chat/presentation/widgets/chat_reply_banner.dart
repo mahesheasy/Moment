@@ -19,7 +19,7 @@ class ChatReplyBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
       decoration: BoxDecoration(
-        color: MomentSpaceTheme.composerBarBackground,
+        color: MomentSpaceTheme.composerBarBackground(context),
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),

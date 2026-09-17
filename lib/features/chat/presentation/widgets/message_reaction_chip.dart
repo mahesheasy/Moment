@@ -28,7 +28,7 @@ class MessageReactionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
-          color: MomentSpaceTheme.surfaceElevated,
+          color: MomentSpaceTheme.surfaceElevated(context),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: MomentSpaceTheme.border(context),

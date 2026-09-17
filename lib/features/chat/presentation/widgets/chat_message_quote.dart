@@ -32,7 +32,7 @@ class ChatMessageQuote extends StatelessWidget {
       decoration: BoxDecoration(
         color: isMineBubble
             ? Colors.white.withValues(alpha: 0.06)
-            : MomentSpaceTheme.surfaceElevated.withValues(alpha: 0.4),
+            : MomentSpaceTheme.surfaceElevated(context).withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(4),
         border: Border(
           left: BorderSide(color: barColor, width: 1.5),

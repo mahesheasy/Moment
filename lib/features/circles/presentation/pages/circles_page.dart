@@ -175,10 +175,8 @@ class _CirclesBodyState extends State<_CirclesBody> {
         circles.sort((a, b) => b.memberCount.compareTo(a.memberCount));
       case _CircleSort.recentActivity:
         circles.sort((a, b) {
-          final aTime =
-              widget.state.activityByCircleId[a.id]?.latestActivityAt;
-          final bTime =
-              widget.state.activityByCircleId[b.id]?.latestActivityAt;
+          final aTime = widget.state.activityByCircleId[a.id]?.latestActivityAt;
+          final bTime = widget.state.activityByCircleId[b.id]?.latestActivityAt;
           if (aTime == null && bTime == null) {
             return b.createdAt.compareTo(a.createdAt);
           }
@@ -208,8 +206,9 @@ class _CirclesBodyState extends State<_CirclesBody> {
               children: [
                 Text(
                   'Sort & filter',
-                  style: SettingsType.body(AppColors.textPrimaryDark)
-                      .copyWith(fontWeight: FontWeight.w500),
+                  style: SettingsType.body(
+                    AppColors.textPrimaryDark,
+                  ).copyWith(fontWeight: FontWeight.w500),
                 ),
                 SizedBox(height: 12),
                 _FilterOption(
@@ -504,16 +503,16 @@ class _CirclesHeader extends StatelessWidget {
             children: [
               RichText(
                 text: TextSpan(
-                  style: SettingsType.body(AppColors.textPrimaryDark).copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: SettingsType.body(
+                    AppColors.textPrimaryDark,
+                  ).copyWith(fontWeight: FontWeight.w500),
                   children: [
                     const TextSpan(text: 'Your '),
                     TextSpan(
                       text: 'Circles',
-                      style: SettingsType.body(AppColors.violet).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: SettingsType.body(
+                        AppColors.violet,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -550,9 +549,9 @@ class _CirclesHeader extends StatelessWidget {
                     SizedBox(width: 4),
                     Text(
                       'Create',
-                      style: SettingsType.caption(Colors.white).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: SettingsType.caption(
+                        Colors.white,
+                      ).copyWith(fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -624,121 +623,155 @@ class _CircleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      resolvedTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SettingsType.body(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 3),
-                    if (circle != null)
-                      Text.rich(
-                        TextSpan(
-                          style: SettingsType.caption(
-                            AppColors.textTertiaryDark,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                resolvedTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: SettingsType.body(
+                                  AppColors.textPrimaryDark,
+                                ).copyWith(fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 3),
+                              if (circle != null)
+                                Text.rich(
+                                  TextSpan(
+                                    style: SettingsType.caption(
+                                      AppColors.textTertiaryDark,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text:
+                                            '${memberCount == 1 ? '1 member' : '$memberCount members'} · ',
+                                      ),
+                                      TextSpan(
+                                        text:
+                                            '$momentCount ${momentCount == 1 ? 'moment' : 'moments'}',
+                                        style:  TextStyle(
+                                          color: AppColors.violet,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Text(
+                                  subtitle ?? '',
+                                  style: SettingsType.caption(
+                                    AppColors.textTertiaryDark,
+                                  ),
+                                ),
+                              if (circle != null &&
+                                  activity?.latestActivityAt != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Last moment · ${relativeTimeAgo(activity!.latestActivityAt!)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SettingsType.caption(
+                                    AppColors.textTertiaryDark,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          children: [
-                            TextSpan(
-                              text:
-                                  '${memberCount == 1 ? '1 member' : '$memberCount members'} · ',
-                            ),
-                            TextSpan(
-                              text:
-                                  '$momentCount ${momentCount == 1 ? 'moment' : 'moments'}',
-                              style: TextStyle(color: AppColors.violet),
-                            ),
-                          ],
                         ),
-                      )
-                    else
-                      Text(
-                        subtitle ?? '',
-                        style: SettingsType.caption(
-                          AppColors.textTertiaryDark,
-                        ),
-                      ),
+                        if (circle != null &&
+                            activity?.latestImageUrl != null) ...[
+                          const SizedBox(width: 8),
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: MomentCachedImage(
+                                  imageUrl: activity!.latestImageUrl!,
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              if (momentCount > 0)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    alignment: Alignment.center,
+                                    decoration:  BoxDecoration(
+                                      color: AppColors.violet,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      momentCount > 9 ? '9+' : '$momentCount',
+                                      style: SettingsType.caption(Colors.white)
+                                          .copyWith(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
                     if (circle != null &&
-                        activity?.latestActivityAt != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Last moment · ${relativeTimeAgo(activity!.latestActivityAt!)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SettingsType.caption(
-                          AppColors.textTertiaryDark,
-                        ),
-                      ),
-                    ],
-                    if (circle != null && members.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      CircleMemberAvatarStack(
-                        circleId: circle!.id,
-                        members: members,
+                        (members.isNotEmpty || onMore != null)) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (members.isNotEmpty)
+                            CircleMemberAvatarStack(
+                              circleId: circle!.id,
+                              members: members,
+                            ),
+                          const Spacer(),
+                          if (onMore != null)
+                            _CircleCardMoreButton(onPressed: onMore!),
+                        ],
                       ),
                     ],
                   ],
                 ),
               ),
-              if (circle != null) ...[
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (activity?.latestImageUrl != null)
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: MomentCachedImage(
-                              imageUrl: activity!.latestImageUrl!,
-                              width: 44,
-                              height: 44,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          if (momentCount > 0)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppColors.violet,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  momentCount > 9 ? '9+' : '$momentCount',
-                                  style:
-                                      SettingsType.caption(Colors.white).copyWith(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    if (onMore != null)
-                      IconButton(
-                        onPressed: onMore,
-                      icon: const Icon(Icons.more_horiz_rounded),
-                      color: AppColors.textTertiaryDark,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
-                      ),
-                      tooltip: 'Circle options',
-                    ),
-                  ],
-                ),
-              ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleCardMoreButton extends StatelessWidget {
+  const _CircleCardMoreButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceElevatedDark,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child:  SizedBox(
+          width: 28,
+          height: 28,
+          child: Icon(
+            Icons.more_vert_rounded,
+            size: 18,
+            color: AppColors.textSecondaryDark,
           ),
         ),
       ),
@@ -832,53 +865,52 @@ class _CreateCircleCta extends StatelessWidget {
               color: AppColors.violet.withValues(alpha: 0.06),
             ),
             child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.violet.withValues(alpha: 0.35),
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.violet.withValues(alpha: 0.35),
+                    ),
+                    color: AppColors.violet.withValues(alpha: 0.1),
                   ),
-                  color: AppColors.violet.withValues(alpha: 0.1),
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 18,
+                    color: AppColors.violet,
+                  ),
                 ),
-                child: Icon(
-                  Icons.add_rounded,
-                  size: 18,
-                  color: AppColors.violet,
-                ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Create a circle',
-                      style: SettingsType.body(AppColors.textPrimaryDark)
-                          .copyWith(fontWeight: FontWeight.w500),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Bring people together',
-                      style: SettingsType.caption(
-                        AppColors.textTertiaryDark,
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Create a circle',
+                        style: SettingsType.body(
+                          AppColors.textPrimaryDark,
+                        ).copyWith(fontWeight: FontWeight.w500),
                       ),
-                    ),
-                  ],
+                      SizedBox(height: 2),
+                      Text(
+                        'Bring people together',
+                        style: SettingsType.caption(AppColors.textTertiaryDark),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  _assetPath,
-                  width: 72,
-                  height: 56,
-                  fit: BoxFit.cover,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    _assetPath,
+                    width: 72,
+                    height: 56,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
         ),

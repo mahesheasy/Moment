@@ -79,17 +79,17 @@ class _MyNotesChip extends StatelessWidget {
               height: 62,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: ChatTheme.actionGradient,
+                gradient: ChatTheme.actionGradient(context),
               ),
               padding: const EdgeInsets.all(2.5),
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: ChatTheme.threadBackground,
+                  color: ChatTheme.threadBackground(context),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.edit_note_rounded,
-                  color: ChatTheme.accentPink,
+                  color: ChatTheme.accentPink(context),
                   size: 28,
                 ),
               ),
@@ -127,7 +127,7 @@ class _StoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final firstName = user.displayName.split(' ').first;
-    final ringColor = hasUnread ? ChatTheme.accentPink : ChatTheme.onlineGreen;
+    final ringColor = hasUnread ? ChatTheme.accentPink(context) : ChatTheme.onlineGreen;
 
     return GestureDetector(
       onTap: onTap,
@@ -146,7 +146,7 @@ class _StoryChip extends StatelessWidget {
                     boxShadow: hasUnread
                         ? [
                             BoxShadow(
-                              color: ChatTheme.accentPink.withValues(alpha: 0.35),
+                              color: ChatTheme.accentPink(context).withValues(alpha: 0.35),
                               blurRadius: 8,
                             ),
                           ]
@@ -169,11 +169,11 @@ class _StoryChip extends StatelessWidget {
                           height: 12,
                           decoration: BoxDecoration(
                             color: hasUnread
-                                ? ChatTheme.accentPink
+                                ? ChatTheme.accentPink(context)
                                 : ChatTheme.onlineGreen,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: ChatTheme.threadBackground,
+                              color: ChatTheme.threadBackground(context),
                               width: 2,
                             ),
                           ),

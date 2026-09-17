@@ -8,13 +8,18 @@ object WidgetPrivacyResolver {
         senderId: String?,
     ): String {
         val prefs = context.getSharedPreferences(MomentWidgetDataStore.PREFS, Context.MODE_PRIVATE)
-        val globalMode = prefs.getString(MomentWidgetDataStore.KEY_PRIVACY_MODE, "full") ?: "full"
-        val privacyPersonId =
-            prefs.getString(MomentWidgetDataStore.KEY_PRIVACY_PERSON, null)?.takeIf {
-                it.isNotBlank()
+        val global = prefs.getString(MomentWidgetDataStore.KEY_PRIVACY_MODE, "full") ?: "full"
+
+        if (!senderId.isNullOrBlank()) {
+            WidgetPrivacyOverridesStore.load(context)[senderId]?.let { return it }
+            val legacyPerson =
+                prefs.getString(MomentWidgetDataStore.KEY_PRIVACY_PERSON, null)?.takeIf {
+                    it.isNotBlank()
+                }
+            if (legacyPerson != null) {
+                return if (legacyPerson == senderId) global else "full"
             }
-        if (privacyPersonId == null) return globalMode
-        if (senderId.isNullOrBlank()) return globalMode
-        return if (privacyPersonId == senderId) globalMode else "full"
+        }
+        return global
     }
 }
