@@ -27,6 +27,12 @@ object WidgetMediaDownloader {
         scope.launch {
             WidgetMomentSyncLog.mediaDownloadStart(momentId)
             val current = WidgetMomentQueue.findEntry(appContext, momentId) ?: return@launch
+            val privacyMode =
+                WidgetPrivacyResolver.resolvePrivacyForSender(appContext, current.senderId)
+            if (!shouldCacheMomentImage(privacyMode)) {
+                WidgetPrivateImageGuard.purgeMomentImage(appContext, current)
+                return@launch
+            }
 
             val imagePath =
                 if (!imageUrl.isNullOrBlank()) {
@@ -66,4 +72,7 @@ object WidgetMediaDownloader {
             WidgetRenderLatency.onPhotoRendered(momentId)
         }
     }
+
+    private fun shouldCacheMomentImage(privacyMode: String): Boolean =
+        WidgetPrivateImageGuard.shouldCacheMomentImage(privacyMode)
 }

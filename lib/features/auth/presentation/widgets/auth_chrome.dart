@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moment/app/di/injection.dart';
 import 'package:moment/app/router/app_routes.dart';
+import 'package:moment/features/auth/data/datasources/onboarding_preferences_local_cache.dart';
 import 'package:moment/core/theme/app_component_sizes.dart';
 import 'package:moment/core/theme/app_spacing.dart';
 import 'package:moment/core/theme/moment_theme.dart';
@@ -73,8 +75,8 @@ class _GlowBlob extends StatelessWidget {
 class AuthLogoMark extends StatelessWidget {
   const AuthLogoMark({super.key});
 
-  static const assetPath = 'assets/images/auth_logo_m.png';
-  static const size = 96.0;
+  static const assetPath = 'assets/images/app_launcher_icon.png';
+  static const size = 88.0;
 
   @override
   Widget build(BuildContext context) {
@@ -84,20 +86,19 @@ class AuthLogoMark extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: mc.accent.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: mc.accent.withValues(alpha: 0.28),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(18),
+      clipBehavior: Clip.antiAlias,
       child: Image.asset(
         assetPath,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
       ),
     );
   }
@@ -490,12 +491,15 @@ class AuthBackButton extends StatelessWidget {
         side: BorderSide(color: mc.border.withValues(alpha: 0.5)),
       ),
       child: InkWell(
-        onTap: () {
+        onTap: () async {
           if (context.canPop()) {
             context.pop();
-          } else {
-            context.go(AppRoutes.onboarding);
+            return;
           }
+          final onboardingDone =
+              await sl<OnboardingPreferencesLocalCache>().isComplete();
+          if (!context.mounted) return;
+          context.go(onboardingDone ? AppRoutes.login : AppRoutes.onboarding);
         },
         customBorder: const CircleBorder(),
         child: SizedBox(

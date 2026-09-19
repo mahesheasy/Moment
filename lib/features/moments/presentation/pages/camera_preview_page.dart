@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:moment/core/theme/app_colors.dart';
-import 'package:moment/core/theme/app_icons.dart';
-import 'package:moment/core/theme/app_radius.dart';
 import 'package:moment/core/theme/app_spacing.dart';
-import 'package:moment/core/widgets/moment_states.dart';
 import 'package:moment/features/moments/presentation/cubit/moment_cubit.dart';
 import 'package:moment/features/moments/presentation/pages/camera_send_to_page.dart';
-import 'package:moment/features/moments/presentation/widgets/camera_captions_sheet.dart';
 import 'package:moment/features/moments/presentation/widgets/camera_chrome.dart';
+import 'package:moment/features/moments/presentation/widgets/camera_preview_caption_field.dart';
+import 'package:moment/features/moments/presentation/widgets/camera_preview_header.dart';
+import 'package:moment/features/moments/presentation/widgets/camera_preview_photo_card.dart';
+import 'package:moment/features/moments/presentation/widgets/moment_detail_arc.dart';
+import 'package:moment/features/moments/presentation/widgets/moment_detail_arc_panel.dart';
 
 class CameraPreviewPage extends StatefulWidget {
   const CameraPreviewPage({super.key});
@@ -20,8 +20,11 @@ class CameraPreviewPage extends StatefulWidget {
 }
 
 class _CameraPreviewPageState extends State<CameraPreviewPage> {
+  static const int _captionLimit = 200;
+
   late final TextEditingController _captionController;
   late final TextEditingController _reviewController;
+  MomentDetailType _selectedDetail = MomentDetailType.review;
 
   @override
   void initState() {
@@ -41,29 +44,12 @@ class _CameraPreviewPageState extends State<CameraPreviewPage> {
     super.dispose();
   }
 
-  void _openDetails() {
-    showCameraCaptionsSheet(
-      context,
-      reviewController: _reviewController,
-    );
-  }
-
-  int _detailCount(CameraState state) {
-    var count = 0;
-    if (state.reviewRating > 0) count++;
-    if (state.includeLocation) count++;
-    if (state.includeWeather) count++;
-    if (state.includeTime) count++;
-    if (state.includeStreak) count++;
-    count += state.decorations.length;
-    return count;
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CameraCubit, CameraState>(
       builder: (context, state) {
         final bytes = state.imageBytes;
+        final arcItems = momentDetailArcItems(state);
 
         return Scaffold(
           body: SafeArea(
@@ -77,79 +63,50 @@ class _CameraPreviewPageState extends State<CameraPreviewPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: Icon(
-                          AppIcons.back,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Preview',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _openDetails,
-                        tooltip: 'Stickers',
-                        icon: Icon(
-                          Icons.auto_awesome_rounded,
-                          color: _detailCount(state) > 0
-                              ? AppColors.violet
-                              : Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ],
-                  ),
-                  TextField(
+                  const CameraPreviewHeader(),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Expanded(child: CameraPreviewPhotoCard()),
+                  const SizedBox(height: AppSpacing.md),
+                  CameraPreviewCaptionField(
                     controller: _captionController,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    cursorColor: AppColors.violet,
-                    decoration: InputDecoration(
-                      hintText: 'Add a caption...',
-                      hintStyle: TextStyle(color: AppColors.textTertiaryDark),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
+                    maxLength: _captionLimit,
                     onChanged: context.read<CameraCubit>().setCaption,
                   ),
-                  if (state.isPromptMode && state.promptText != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: Text(
-                        state.promptText!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondaryDark,
-                        ),
+                  const SizedBox(height: AppSpacing.sm),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0E0E10),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.06),
                       ),
                     ),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: AppRadius.xxxlAll,
-                      child: bytes == null
-                          ? MomentShimmer(
-                              child: ColoredBox(
-                                color: AppColors.photoPlaceholderDark,
-                              ),
-                            )
-                          : Image.memory(bytes, fit: BoxFit.cover),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 168,
+                            child: MomentDetailArc(
+                              items: arcItems,
+                              initialType: _selectedDetail,
+                              onSelected: (type) {
+                                if (_selectedDetail != type) {
+                                  setState(() => _selectedDetail = type);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          MomentDetailArcPanel(
+                            selectedType: _selectedDetail,
+                            reviewController: _reviewController,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.md),
                   CameraGradientButton(
                     label: 'Next',
                     onPressed: bytes == null

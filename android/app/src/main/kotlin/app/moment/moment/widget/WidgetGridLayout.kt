@@ -39,20 +39,57 @@ import androidx.glance.unit.ColorProvider
 fun loadWidgetGrid(context: Context): List<WidgetGridCell> {
     val active = WidgetMomentQueue.activeEntry(context) ?: return emptyList()
     val patches = mutableListOf<WidgetMomentEntry>()
+    val widgetData = MomentWidgetDataStore.load(context)
+    val render =
+        WidgetRenderResolver.resolve(
+            context = context,
+            data = widgetData,
+            senderId = active.senderId,
+            momentId = active.momentId,
+        )
 
-    val entry = WidgetImageResolver.ensureCached(context, active)
-    if (entry != active) patches.add(entry)
-    val privacyMode = WidgetPrivacyResolver.resolve(context, entry.senderId)
-    val decoded = WidgetBitmap.decode(entry.imagePath)
-    val bitmap =
-        decoded?.let { source ->
-            resolveWidgetDisplayBitmap(
-                source = source,
-                privacyMode = privacyMode,
-                isUnread = entry.isUnread,
-            )
+    if (render.mode == WidgetRenderMode.PRIVATE) {
+        WidgetPrivateImageGuard.purgeMomentImage(context, active)
+    }
+
+    val entry =
+        if (WidgetPrivateImageGuard.shouldCacheMomentImage(render.privacyMode)) {
+            WidgetImageResolver.ensureCached(context, active).also { cached ->
+                if (cached != active) patches.add(cached)
+            }
+        } else {
+            active
         }
-    val cell = WidgetGridCell(entry = entry, bitmap = bitmap, privacyMode = privacyMode)
+
+    val bitmap =
+        when (render.mode) {
+            WidgetRenderMode.PRIVATE,
+            WidgetRenderMode.LOCKED_PLACEHOLDER,
+            WidgetRenderMode.PAUSED,
+            -> null
+            else -> {
+                val decoded = entry.imagePath?.let { WidgetBitmap.decode(it) }
+                decoded?.let { source ->
+                    if (render.skipUnreadBlur) {
+                        source
+                    } else {
+                        resolveWidgetDisplayBitmap(
+                            source = source,
+                            privacyMode = render.privacyMode,
+                            isUnread = entry.isUnread,
+                        )
+                    }
+                }
+            }
+        }
+
+    val cell =
+        WidgetGridCell(
+            entry = entry,
+            bitmap = bitmap,
+            privacyMode = render.privacyMode,
+            renderMode = render.mode,
+        )
 
     if (patches.isNotEmpty()) {
         WidgetMomentQueue.patchEntries(context, patches)
@@ -60,7 +97,14 @@ fun loadWidgetGrid(context: Context): List<WidgetGridCell> {
     return listOf(cell)
 }
 
-/** Unread moments stay blurred; seen moments show the clear photo (Full + Blur modes). */
+/**
+ * Unread-state blur — separate from privacy mode.
+ *
+ * - Privacy **Private**: layout never shows a photo (bitmap not passed to Glance).
+ * - Privacy **Full** + unread: temporarily blurred until viewed in app.
+ * - Privacy **Blur**: unread blur plus blur layout scrim.
+ * - Viewed moments: clear in Full; blur layout scrim remains in Blur mode.
+ */
 fun resolveWidgetDisplayBitmap(
     source: Bitmap,
     privacyMode: String,
@@ -68,7 +112,9 @@ fun resolveWidgetDisplayBitmap(
 ): Bitmap {
     if (privacyMode == "private") return source
     if (!isUnread) return source
-    return WidgetBitmap.blur(source)
+    // Blur privacy already adds a dark scrim — use a lighter unread pre-blur.
+    val strength = if (privacyMode == "blur") 0.5f else 0.85f
+    return WidgetBitmap.blur(source, strength)
 }
 
 /** @deprecated Use [resolveWidgetDisplayBitmap]. */

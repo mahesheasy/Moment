@@ -7,4 +7,5 @@ data class WidgetGridCell(
     val entry: WidgetMomentEntry,
     val bitmap: Bitmap?,
     val privacyMode: String,
+    val renderMode: WidgetRenderMode = WidgetRenderMode.FULL,
 )

@@ -40,6 +40,7 @@ import 'package:moment/features/settings/presentation/pages/notifications_page.d
 import 'package:moment/features/settings/presentation/pages/report_problem_page.dart';
 import 'package:moment/features/settings/presentation/pages/settings_page.dart';
 import 'package:moment/app/di/injection.dart';
+import 'package:moment/features/auth/data/datasources/onboarding_preferences_local_cache.dart';
 import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
 import 'package:moment/core/constants/app_constants.dart';
 import 'package:moment/core/deep_links/deep_link_mapper.dart';
@@ -78,8 +79,14 @@ GoRouter createAppRouter({
         return location == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      if (status == SessionStatus.unauthenticated && !isPublicRoute(location)) {
-        return AppRoutes.login;
+      if (status == SessionStatus.unauthenticated) {
+        if (location == AppRoutes.onboarding &&
+            sl<OnboardingPreferencesLocalCache>().isCompleteSync) {
+          return AppRoutes.login;
+        }
+        if (!isPublicRoute(location)) {
+          return AppRoutes.login;
+        }
       }
 
       if (status == SessionStatus.authenticated) {

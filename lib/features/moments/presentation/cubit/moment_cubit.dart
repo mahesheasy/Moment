@@ -346,6 +346,7 @@ class CameraState extends Equatable {
     this.includeStreak = false,
     this.streakCount = 0,
     this.isLoadingContext = false,
+    this.previewRevision = 0,
   });
 
   final CameraStatus status;
@@ -380,6 +381,7 @@ class CameraState extends Equatable {
   final bool includeStreak;
   final int streakCount;
   final bool isLoadingContext;
+  final int previewRevision;
 
   bool get isAllSelected {
     if (friends.isEmpty && circles.isEmpty) return false;
@@ -474,6 +476,7 @@ class CameraState extends Equatable {
     bool? includeStreak,
     int? streakCount,
     bool? isLoadingContext,
+    int? previewRevision,
   }) {
     return CameraState(
       status: status ?? this.status,
@@ -508,6 +511,7 @@ class CameraState extends Equatable {
       includeStreak: includeStreak ?? this.includeStreak,
       streakCount: streakCount ?? this.streakCount,
       isLoadingContext: isLoadingContext ?? this.isLoadingContext,
+      previewRevision: previewRevision ?? this.previewRevision,
     );
   }
 
@@ -584,6 +588,7 @@ class CameraState extends Equatable {
     includeStreak,
     streakCount,
     isLoadingContext,
+    previewRevision,
   ];
 }
 
@@ -700,38 +705,113 @@ class CameraCubit extends Cubit<CameraState> {
     );
   }
 
+  void replacePreviewBytes(Uint8List bytes) {
+    if (state.imageBytes == null) return;
+    emit(
+      state.copyWith(
+        imageBytes: bytes,
+        mimeType: 'image/jpeg',
+        previewRevision: state.previewRevision + 1,
+      ),
+    );
+  }
+
   void setCaption(String caption) {
     emit(state.copyWith(caption: caption));
   }
 
   void setReviewRating(int rating) {
-    emit(state.copyWith(reviewRating: rating.clamp(0, 5)));
+    final nextRating = rating.clamp(0, 5);
+    if (nextRating == 0) {
+      emit(state.copyWith(reviewRating: 0));
+      return;
+    }
+    if (state.reviewRating == 0) {
+      emit(
+        state.copyWith(
+          reviewRating: nextRating,
+          includeLocation: false,
+          includeWeather: false,
+          includeTime: false,
+          decorations: const {},
+        ),
+      );
+      return;
+    }
+    emit(state.copyWith(reviewRating: nextRating));
   }
 
   void setReviewText(String text) {
     emit(state.copyWith(reviewText: text));
   }
 
+  /// Only one add-on (location, weather, time, sticker, or review) per moment.
   void toggleDecoration(String tag) {
-    final next = Set<String>.from(state.decorations);
-    if (next.contains(tag)) {
-      next.remove(tag);
-    } else {
-      next.add(tag);
+    if (state.decorations.contains(tag)) {
+      emit(state.copyWith(decorations: const {}));
+      return;
     }
-    emit(state.copyWith(decorations: next));
+    emit(
+      state.copyWith(
+        decorations: {tag},
+        includeLocation: false,
+        includeWeather: false,
+        includeTime: false,
+        reviewRating: 0,
+        reviewText: '',
+      ),
+    );
   }
 
   void toggleIncludeLocation() {
-    emit(state.copyWith(includeLocation: !state.includeLocation));
+    if (state.includeLocation) {
+      emit(state.copyWith(includeLocation: false));
+      return;
+    }
+    emit(
+      state.copyWith(
+        includeLocation: true,
+        includeWeather: false,
+        includeTime: false,
+        decorations: const {},
+        reviewRating: 0,
+        reviewText: '',
+      ),
+    );
   }
 
   void toggleIncludeWeather() {
-    emit(state.copyWith(includeWeather: !state.includeWeather));
+    if (state.includeWeather) {
+      emit(state.copyWith(includeWeather: false));
+      return;
+    }
+    emit(
+      state.copyWith(
+        includeWeather: true,
+        includeLocation: false,
+        includeTime: false,
+        decorations: const {},
+        reviewRating: 0,
+        reviewText: '',
+      ),
+    );
   }
 
   void toggleIncludeTime() {
-    emit(state.copyWith(includeTime: !state.includeTime));
+    if (state.includeTime) {
+      emit(state.copyWith(includeTime: false));
+      return;
+    }
+    emit(
+      state.copyWith(
+        includeTime: true,
+        includeLocation: false,
+        includeWeather: false,
+        decorations: const {},
+        reviewRating: 0,
+        reviewText: '',
+      ),
+    );
   }
 
   void toggleIncludeStreak() {

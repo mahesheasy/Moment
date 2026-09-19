@@ -10,8 +10,9 @@ class SettingsType {
     fontSize: 14,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
-    height: 1.28,
+    height: 1.4,
     color: color,
+    decoration: TextDecoration.none,
   );
 
   static TextStyle body(Color color) => TextStyle(
@@ -19,8 +20,9 @@ class SettingsType {
     fontSize: 12,
     fontWeight: FontWeight.w400,
     letterSpacing: 0.08,
-    height: 1.4,
+    height: 1.45,
     color: color,
+    decoration: TextDecoration.none,
   );
 
   static TextStyle caption(Color color) => TextStyle(
@@ -28,7 +30,8 @@ class SettingsType {
     fontSize: 10,
     fontWeight: FontWeight.w500,
     letterSpacing: 0.2,
-    height: 1.3,
+    height: 1.45,
     color: color,
+    decoration: TextDecoration.none,
   );
 }

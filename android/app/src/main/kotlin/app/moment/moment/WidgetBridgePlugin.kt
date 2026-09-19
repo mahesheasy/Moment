@@ -14,6 +14,8 @@ import app.moment.moment.widget.WidgetMomentEntry
 import app.moment.moment.widget.WidgetMomentQueue
 import app.moment.moment.widget.WidgetOemReliability
 import app.moment.moment.widget.WidgetPrivacyOverridesStore
+import app.moment.moment.widget.WidgetPrivacyResolver
+import app.moment.moment.widget.WidgetPrivateImageGuard
 import app.moment.moment.widget.WidgetRenderLatency
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -80,7 +82,12 @@ class WidgetBridgePlugin(
                     )
                 WidgetMomentQueue.setDisplayMoment(context, entry)
                 WidgetRenderLatency.begin(momentId, "realtime", entry.createdAtMillis)
-                WidgetMediaDownloader.enqueue(context, momentId, imageUrl, avatarUrl)
+                enqueueMomentMedia(
+                    senderId = entry.senderId,
+                    momentId = momentId,
+                    imageUrl = imageUrl,
+                    avatarUrl = avatarUrl,
+                )
                 scope.launch {
                     MomentWidgetUpdater.updateIncomingMoment(context, momentId)
                     result.success(null)
@@ -102,11 +109,23 @@ class WidgetBridgePlugin(
                             val avatarBytes = map["avatarBytes"] as? ByteArray
                             val imageUrl = map["imageUrl"] as? String
                             val avatarUrl = map["avatarUrl"] as? String
+                            val senderId = map["senderId"] as? String ?: ""
+                            val privacyMode =
+                                WidgetPrivacyResolver.resolvePrivacyForSender(
+                                    context,
+                                    senderId,
+                                )
+                            var imagePath =
+                                saveWidgetImage(imageBytes, "moment_$momentId.jpg")
+                            if (!WidgetPrivateImageGuard.shouldCacheMomentImage(privacyMode)) {
+                                WidgetPrivateImageGuard.purgePath(imagePath)
+                                imagePath = null
+                            }
                             WidgetMomentEntry(
                                 momentId = momentId,
                                 senderName = map["senderName"] as? String ?: "",
-                                senderId = map["senderId"] as? String ?: "",
-                                imagePath = saveWidgetImage(imageBytes, "moment_$momentId.jpg"),
+                                senderId = senderId,
+                                imagePath = imagePath,
                                 avatarPath = saveWidgetImage(avatarBytes, "avatar_$momentId.jpg"),
                                 caption = map["caption"] as? String ?: "",
                                 createdAtMillis =
@@ -129,11 +148,11 @@ class WidgetBridgePlugin(
                             )
                         }
                         entries.forEach { entry ->
-                            WidgetMediaDownloader.enqueue(
-                                context,
-                                entry.momentId,
-                                entry.imageUrl,
-                                entry.avatarUrl,
+                            enqueueMomentMedia(
+                                senderId = entry.senderId,
+                                momentId = entry.momentId,
+                                imageUrl = entry.imageUrl,
+                                avatarUrl = entry.avatarUrl,
                             )
                         }
                         refreshWidget(result, showLatest = showLatest)
@@ -150,15 +169,21 @@ class WidgetBridgePlugin(
                 val avatarBytes = call.argument<ByteArray>("avatarBytes")
                 val imageUrl = call.argument<String>("imageUrl")
                 val avatarUrl = call.argument<String>("avatarUrl")
-                val imagePath = saveWidgetImage(imageBytes, "moment_$momentId.jpg")
+                var imagePath = saveWidgetImage(imageBytes, "moment_$momentId.jpg")
                 val avatarPath = saveWidgetImage(avatarBytes, "avatar_$momentId.jpg")
-                val senderId = call.argument<String>("senderId")
+                val senderId = call.argument<String>("senderId").orEmpty()
+                val privacyMode =
+                    WidgetPrivacyResolver.resolvePrivacyForSender(context, senderId)
+                if (!WidgetPrivateImageGuard.shouldCacheMomentImage(privacyMode)) {
+                    WidgetPrivateImageGuard.purgePath(imagePath)
+                    imagePath = null
+                }
 
                 val entry =
                     WidgetMomentEntry(
                         momentId = momentId,
                         senderName = senderName,
-                        senderId = senderId.orEmpty(),
+                        senderId = senderId,
                         imagePath = imagePath,
                         avatarPath = avatarPath,
                         caption = caption.orEmpty(),
@@ -168,7 +193,12 @@ class WidgetBridgePlugin(
                         avatarUrl = avatarUrl?.takeIf { it.isNotBlank() },
                     )
                 WidgetMomentQueue.upsertMoment(context, entry, promoteNew = true)
-                WidgetMediaDownloader.enqueue(context, momentId, imageUrl, avatarUrl)
+                enqueueMomentMedia(
+                    senderId = senderId,
+                    momentId = momentId,
+                    imageUrl = imageUrl,
+                    avatarUrl = avatarUrl,
+                )
                 refreshWidget(result, showLatest = true)
             }
 
@@ -304,6 +334,22 @@ class WidgetBridgePlugin(
                 else -> null
             }
         return parsed ?: 0L
+    }
+
+    private fun enqueueMomentMedia(
+        senderId: String,
+        momentId: String,
+        imageUrl: String?,
+        avatarUrl: String?,
+    ) {
+        val privacyMode = WidgetPrivacyResolver.resolvePrivacyForSender(context, senderId)
+        if (!WidgetPrivateImageGuard.shouldCacheMomentImage(privacyMode)) {
+            WidgetMomentQueue.findEntry(context, momentId)?.let { entry ->
+                WidgetPrivateImageGuard.purgeMomentImage(context, entry)
+            }
+            return
+        }
+        WidgetMediaDownloader.enqueue(context, momentId, imageUrl, avatarUrl)
     }
 
     private fun saveWidgetImage(imageBytes: ByteArray?, fileName: String): String? {

@@ -133,6 +133,36 @@ void main() {
     expect(restored, prefs);
   });
 
+  test('privacyForSender default falls back to global mode', () {
+    const prefs = WidgetPreferences(
+      theme: WidgetTheme.minimal,
+      accentColor: '#FF6B8A',
+      typography: WidgetTypography.defaultStyle,
+      widgetMode: WidgetMode.latest,
+      privacyMode: WidgetPrivacyMode.blur,
+    );
+
+    expect(prefs.privacyForSender('any-friend'), WidgetPrivacyMode.blur);
+  });
+
+  test('privacyForSender per-person override beats global', () {
+    const prefs = WidgetPreferences(
+      theme: WidgetTheme.minimal,
+      accentColor: '#FF6B8A',
+      typography: WidgetTypography.defaultStyle,
+      widgetMode: WidgetMode.latest,
+      privacyMode: WidgetPrivacyMode.blur,
+      privacyOverrides: {
+        'mom-id': WidgetPrivacyMode.private,
+        'jay-id': WidgetPrivacyMode.full,
+      },
+    );
+
+    expect(prefs.privacyForSender('mom-id'), WidgetPrivacyMode.private);
+    expect(prefs.privacyForSender('jay-id'), WidgetPrivacyMode.full);
+    expect(prefs.privacyForSender('other'), WidgetPrivacyMode.blur);
+  });
+
   test('WidgetPreferences mergeLocal applies device overrides', () {
     const remote = WidgetPreferences(
       theme: WidgetTheme.minimal,

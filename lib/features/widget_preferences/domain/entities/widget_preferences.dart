@@ -196,13 +196,15 @@ class WidgetPreferences extends Equatable {
   final bool showCaptions;
   final bool lockScreenPrivacy;
   final bool paused;
-  /// Legacy single-person scope. Prefer [privacyOverrides].
+  /// Legacy single-person scope (deprecated — no UI). Prefer [privacyOverrides].
   final String? privacyPersonId;
   /// Per-sender privacy mode overrides (senderId -> mode).
   final Map<String, WidgetPrivacyMode> privacyOverrides;
   final bool showStreak;
 
-  /// Resolves which privacy mode to use for a moment from [senderId].
+  /// Resolves privacy for [senderId]. Mirrors Android [WidgetPrivacyResolver].
+  ///
+  /// Priority: per-sender override → legacy [privacyPersonId] → global [privacyMode].
   WidgetPrivacyMode privacyForSender(String senderId) {
     final override = privacyOverrides[senderId];
     if (override != null) return override;

@@ -3,6 +3,18 @@ package app.moment.moment.widget
 import android.content.Context
 
 object WidgetPrivacyResolver {
+    /**
+     * Resolves privacy for a moment sender.
+     *
+     * Priority: per-sender override → legacy [MomentWidgetDataStore.KEY_PRIVACY_PERSON]
+     * → global privacy mode.
+     */
+    fun resolvePrivacyForSender(
+        context: Context,
+        senderId: String?,
+    ): String = resolve(context, senderId)
+
+    /** @see resolvePrivacyForSender */
     fun resolve(
         context: Context,
         senderId: String?,

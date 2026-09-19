@@ -40,11 +40,6 @@ class _WidgetPrivacyView extends StatelessWidget {
             context,
           ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
         }
-        if (state.savedMessage != null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.savedMessage!)));
-        }
       },
       builder: (context, state) {
         if (state.status == WidgetCustomizationStatus.loading ||
@@ -67,9 +62,7 @@ class _WidgetPrivacyView extends StatelessWidget {
 
         final draft = state.draft!;
         final cubit = context.read<WidgetCustomizationCubit>();
-        final saving = state.status == WidgetCustomizationStatus.saving;
         final previewPerson = _previewPerson(draft, state);
-        final bottom = MediaQuery.paddingOf(context).bottom;
 
         return MomentScaffold(
           appBar: MomentAppBar(
@@ -79,53 +72,22 @@ class _WidgetPrivacyView extends StatelessWidget {
               onPressed: () => context.pop(),
             ),
           ),
-          bottomNavigationBar: Container(
-            padding: EdgeInsets.fromLTRB(20, 10, 20, 12 + bottom),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundDark,
-              border: Border(
-                top: BorderSide(
-                  color: AppColors.borderDark.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              height: AppComponentSizes.buttonHeightLg,
-              child: FilledButton(
-                onPressed: saving ? null : cubit.savePrivacy,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.violet,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  disabledBackgroundColor:
-                      AppColors.violet.withValues(alpha: 0.45),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.lgAll,
-                  ),
-                  textStyle: SettingsType.title(Colors.white),
-                ),
-                child: saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Save'),
-              ),
-            ),
-          ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
             children: [
               Text(
-                'Choose how moments appear on your home screen.',
+                'How moments appear',
+                style: SettingsType.title(AppColors.textPrimaryDark).copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Privacy controls how a moment looks — not which moment is selected.',
                 style: SettingsType.body(AppColors.textSecondaryDark),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Center(
                 child: WidgetStylePreview(
                   preferences: draft,
@@ -137,13 +99,13 @@ class _WidgetPrivacyView extends StatelessWidget {
                       ? state.previewStackMoments.first.relativeTime
                       : 'Just now',
                   forcePrivacyMode: draft.privacyForSender(previewPerson.id),
-                  previewSize: 228,
+                  previewSize: 200,
                   streakCount: state.previewStreakCount,
                 ),
               ),
               const SizedBox(height: 28),
               SettingsSection(
-                title: 'Mode',
+                title: 'Privacy',
                 children: [
                   for (final mode in WidgetPrivacyMode.values)
                     _PrivacyRow(
@@ -155,7 +117,7 @@ class _WidgetPrivacyView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               SettingsSection(
-                title: 'Per-person overrides',
+                title: 'For specific people',
                 children: [
                   if (state.friends.isEmpty)
                     Padding(
@@ -185,6 +147,49 @@ class _WidgetPrivacyView extends StatelessWidget {
                         ),
                       ),
                     ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SettingsSection(
+                title: 'Lock screen',
+                children: [
+                  SettingsToggleRow(
+                    label: 'Hide widget content when locked',
+                    value: draft.lockScreenPrivacy,
+                    onChanged: cubit.setLockScreenPrivacy,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SettingsSection(
+                title: 'Display',
+                children: [
+                  SettingsToggleRow(
+                    label: 'Show sender',
+                    value: draft.showSender,
+                    onChanged: cubit.setShowSender,
+                  ),
+                  SettingsToggleRow(
+                    label: 'Show timestamp',
+                    value: draft.showTimestamp,
+                    onChanged: cubit.setShowTimestamp,
+                  ),
+                  SettingsToggleRow(
+                    label: 'Show captions',
+                    value: draft.showCaptions,
+                    onChanged: cubit.setShowCaptions,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              SettingsSection(
+                title: 'Updates',
+                children: [
+                  SettingsToggleRow(
+                    label: 'Pause updates',
+                    value: draft.paused,
+                    onChanged: cubit.setPaused,
+                  ),
                 ],
               ),
             ],
@@ -233,51 +238,84 @@ class _WidgetPrivacyView extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         final override = draft.privacyOverrides[senderId];
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text(
-                  senderName,
-                  style: SettingsType.title(AppColors.textPrimaryDark),
-                ),
-              ),
-              ListTile(
-                title: Text(
-                  'Default (${draft.privacyMode.label})',
-                  style: SettingsType.body(AppColors.textPrimaryDark),
-                ),
-                trailing: MomentRadioIndicator(selected: override == null),
-                onTap: () {
-                  cubit.setPrivacyOverride(senderId, null);
-                  Navigator.of(context).pop();
-                },
-              ),
-              for (final mode in WidgetPrivacyMode.values)
-                ListTile(
-                  title: Text(
-                    mode.label,
-                    style: SettingsType.body(AppColors.textPrimaryDark),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              0,
+              AppSpacing.sm,
+              0,
+              AppSpacing.md,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: Column(
+                    children: [
+                      Text(
+                        senderName,
+                        textAlign: TextAlign.center,
+                        style: SettingsType.title(AppColors.textPrimaryDark),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Choose how ${senderName.split(' ').first}\'s moments appear on your widget.',
+                        textAlign: TextAlign.center,
+                        style: SettingsType.body(AppColors.textSecondaryDark),
+                      ),
+                    ],
                   ),
-                  subtitle: Text(
-                    mode.description,
-                    style: SettingsType.caption(AppColors.textSecondaryDark),
-                  ),
-                  trailing: MomentRadioIndicator(selected: override == mode),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _PrivacyPickerRow(
+                  label: 'Default',
+                  subtitle: 'Use global privacy (${draft.privacyMode.label})',
+                  selected: override == null,
                   onTap: () {
-                    cubit.setPrivacyOverride(senderId, mode);
-                    Navigator.of(context).pop();
+                    cubit.setPrivacyOverride(senderId, null);
+                    Navigator.of(sheetContext).pop();
                   },
                 ),
-              const SizedBox(height: AppSpacing.md),
-            ],
+                _PrivacyPickerRow(
+                  label: 'Full',
+                  subtitle: 'Show clearly',
+                  selected: override == WidgetPrivacyMode.full,
+                  onTap: () {
+                    cubit.setPrivacyOverride(senderId, WidgetPrivacyMode.full);
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+                _PrivacyPickerRow(
+                  label: 'Blur',
+                  subtitle: 'Show blurred',
+                  selected: override == WidgetPrivacyMode.blur,
+                  onTap: () {
+                    cubit.setPrivacyOverride(senderId, WidgetPrivacyMode.blur);
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+                _PrivacyPickerRow(
+                  label: 'Private',
+                  subtitle: 'Hide photo',
+                  selected: override == WidgetPrivacyMode.private,
+                  onTap: () {
+                    cubit.setPrivacyOverride(
+                      senderId,
+                      WidgetPrivacyMode.private,
+                    );
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -298,14 +336,49 @@ class _PrivacyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _PrivacyPickerRow(
+      label: mode.label,
+      subtitle: _modeSubtitle(mode),
+      badge: mode == WidgetPrivacyMode.blur ? 'Recommended' : null,
+      selected: selected,
+      onTap: onTap,
+    );
+  }
+
+  String _modeSubtitle(WidgetPrivacyMode mode) => switch (mode) {
+    WidgetPrivacyMode.full => 'Show moments clearly',
+    WidgetPrivacyMode.blur => 'Keep moments subtle',
+    WidgetPrivacyMode.private => 'Hide moment photos',
+  };
+}
+
+class _PrivacyPickerRow extends StatelessWidget {
+  const _PrivacyPickerRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.subtitle,
+    this.badge,
+  });
+
+  final String label;
+  final String? subtitle;
+  final String? badge;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      borderRadius: AppRadius.mdAll,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
           vertical: 14,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
@@ -313,27 +386,32 @@ class _PrivacyRow extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        mode.label,
-                        style: SettingsType.title(AppColors.textPrimaryDark),
+                      Flexible(
+                        child: Text(
+                          label,
+                          style: SettingsType.title(AppColors.textPrimaryDark),
+                        ),
                       ),
-                      if (mode == WidgetPrivacyMode.blur) ...[
+                      if (badge != null) ...[
                         const SizedBox(width: 8),
                         Text(
-                          'Recommended',
+                          badge!,
                           style: SettingsType.caption(AppColors.violet),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    mode.description,
-                    style: SettingsType.body(AppColors.textSecondaryDark),
-                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: SettingsType.body(AppColors.textSecondaryDark),
+                    ),
+                  ],
                 ],
               ),
             ),
+            const SizedBox(width: AppSpacing.md),
             MomentRadioIndicator(selected: selected),
           ],
         ),
@@ -359,9 +437,9 @@ class _OverrideRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = hasOverride
-        ? 'Override: ${effectiveMode.label}'
-        : 'Uses default (${effectiveMode.label})';
+    final valueLabel = hasOverride
+        ? effectiveMode.label
+        : 'Default';
 
     return InkWell(
       onTap: onTap,
@@ -375,20 +453,16 @@ class _OverrideRow extends StatelessWidget {
             MomentAvatar(name: name, imageUrl: avatarUrl, size: 28),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: SettingsType.title(AppColors.textPrimaryDark),
-                  ),
-                  Text(
-                    subtitle,
-                    style: SettingsType.body(AppColors.textSecondaryDark),
-                  ),
-                ],
+              child: Text(
+                name,
+                style: SettingsType.title(AppColors.textPrimaryDark),
               ),
             ),
+            Text(
+              valueLabel,
+              style: SettingsType.body(AppColors.textSecondaryDark),
+            ),
+            const SizedBox(width: 4),
             Icon(
               Icons.chevron_right_rounded,
               color: AppColors.textSecondaryDark,

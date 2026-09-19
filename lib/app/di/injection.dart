@@ -21,6 +21,7 @@ import 'package:moment/core/widget/widget_moment_stream_service.dart';
 import 'package:moment/core/widget/widget_read_cache.dart';
 import 'package:moment/features/auth/data/app_permissions_service.dart';
 import 'package:moment/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:moment/features/auth/data/datasources/onboarding_preferences_local_cache.dart';
 import 'package:moment/features/auth/data/datasources/setup_preferences_local_cache.dart';
 import 'package:moment/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:moment/features/auth/domain/repositories/auth_repository.dart';
@@ -278,6 +279,7 @@ Future<void> configureDependencies({
 
   sl
     ..registerLazySingleton(SetupPreferencesLocalCache.new)
+    ..registerLazySingleton(OnboardingPreferencesLocalCache.new)
     ..registerLazySingleton(AppPermissionsService.new)
     ..registerLazySingleton(MemoriesOverlayController.new)
     ..registerLazySingleton(AndroidWidgetBridge.new)

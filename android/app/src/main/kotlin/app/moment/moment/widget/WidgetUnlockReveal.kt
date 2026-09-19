@@ -2,7 +2,12 @@ package app.moment.moment.widget
 
 import android.content.Context
 
-/** One-shot clear frame on widget after unlock (Full mode only). */
+/**
+ * One-shot clear frame on widget after unlock.
+ *
+ * Armed by [WidgetUserPresentReceiver] when lock-screen privacy was protecting
+ * a recent Full-mode moment. Consumed once per refresh in [WidgetRenderResolver].
+ */
 object WidgetUnlockReveal {
     const val RECENT_MOMENT_WINDOW_MS = 2 * 60 * 1000L
     const val CLEAR_FRAME_REVERT_MS = 1_500L

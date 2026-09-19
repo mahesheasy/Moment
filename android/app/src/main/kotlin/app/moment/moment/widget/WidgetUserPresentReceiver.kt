@@ -15,7 +15,12 @@ class WidgetUserPresentReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_USER_PRESENT) return
         val appContext = context.applicationContext
         val entry = WidgetMomentQueue.activeEntry(appContext) ?: return
-        if (WidgetPrivacyResolver.resolve(appContext, entry.senderId) != "full") return
+        val widgetData = MomentWidgetDataStore.load(appContext)
+        if (!widgetData.lockScreenPrivacy) return
+        if (widgetData.paused) return
+        if (WidgetPrivacyResolver.resolvePrivacyForSender(appContext, entry.senderId) != "full") {
+            return
+        }
 
         val age = System.currentTimeMillis() - entry.createdAtMillis
         if (age < 0 || age > WidgetUnlockReveal.RECENT_MOMENT_WINDOW_MS) return

@@ -192,11 +192,16 @@ private fun MomentWidgetContent(
                     style = style,
                     open = actionStartActivity(launchMainActivityIntent()),
                 )
-            grid.isNotEmpty() && bitmap != null -> {
+            grid.isNotEmpty() -> {
                 val cell = grid.first()
                 val cellData = data.copy(isUnread = cell.entry.isUnread)
-                when (cell.privacyMode) {
-                    "private" ->
+                when (cell.renderMode) {
+                    WidgetRenderMode.LOCKED_PLACEHOLDER ->
+                        SafePlaceholderLayout(
+                            style = style,
+                            open = openMomentAction(cellData),
+                        )
+                    WidgetRenderMode.PRIVATE ->
                         PrivateMomentLayout(
                             title = "New Moment",
                             from = "From ${cellData.senderName.ifBlank { "a friend" }}",
@@ -204,20 +209,46 @@ private fun MomentWidgetContent(
                             style = style,
                             open = openMomentAction(cellData),
                         )
-                    "blur" ->
-                        BlurMomentLayout(
-                            data = cellData,
-                            bitmap = bitmap,
+                    WidgetRenderMode.BLUR ->
+                        if (bitmap != null) {
+                            BlurMomentLayout(
+                                data = cellData,
+                                bitmap = bitmap,
+                                style = style,
+                                liveTime = liveTime,
+                            )
+                        } else {
+                            LocketPendingLayout(
+                                data = cellData,
+                                style = style,
+                                avatarBitmap = avatarBitmap,
+                                liveTime = liveTime,
+                            )
+                        }
+                    WidgetRenderMode.FULL ->
+                        if (bitmap != null) {
+                            FullMomentLayout(
+                                data = cellData,
+                                bitmap = bitmap,
+                                avatarBitmap = avatarBitmap,
+                                style = style,
+                                liveTime = liveTime,
+                            )
+                        } else {
+                            LocketPendingLayout(
+                                data = cellData,
+                                style = style,
+                                avatarBitmap = avatarBitmap,
+                                liveTime = liveTime,
+                            )
+                        }
+                    WidgetRenderMode.PAUSED ->
+                        PrivateMomentLayout(
+                            title = "Widget paused",
+                            from = data.senderName.ifBlank { "Moment" },
+                            action = "Tap to resume",
                             style = style,
-                            liveTime = liveTime,
-                        )
-                    else ->
-                        FullMomentLayout(
-                            data = cellData,
-                            bitmap = bitmap,
-                            avatarBitmap = avatarBitmap,
-                            style = style,
-                            liveTime = liveTime,
+                            open = actionStartActivity(launchMainActivityIntent()),
                         )
                 }
             }
@@ -257,7 +288,14 @@ private fun FullMomentLayout(
         fullMomentRevealAction(context, data.momentId, data.imagePath)
             ?: openMomentAction(data)
     val name = data.senderName.ifBlank { "a friend" }
-    val scale = layoutScale(data.displaySize)
+    val parsed = WidgetCaptionParser.parse(data.caption)
+    val momentStreak = WidgetCaptionParser.streakCountFromCaption(data.caption)
+    val scale = layoutScale(data.displaySize, parsed)
+    val showUserCaption = data.showCaptions && parsed.userCaption.isNotBlank()
+    val showBottomBar =
+        data.showSender ||
+            (data.showTimestamp && liveTime.isNotBlank()) ||
+            showUserCaption
 
     Box(
         modifier =
@@ -272,6 +310,7 @@ private fun FullMomentLayout(
             modifier = GlanceModifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
+        WidgetMomentOverlays(parsed = parsed)
         if (data.isUnread) {
             Box(
                 modifier =
@@ -283,7 +322,7 @@ private fun FullMomentLayout(
                         .cornerRadius(4.dp),
             ) {}
         }
-        if (data.showSender || (data.showTimestamp && liveTime.isNotBlank())) {
+        if (showBottomBar) {
             Box(
                 modifier = GlanceModifier.fillMaxSize(),
                 contentAlignment = Alignment.BottomStart,
@@ -295,48 +334,67 @@ private fun FullMomentLayout(
                             .height(scale.overlayHeight.dp)
                             .background(ColorProvider(Color(0xA6000000))),
                 ) {}
-                Row(
+                Column(
                     modifier =
                         GlanceModifier
                             .fillMaxWidth()
-                            .padding(horizontal = scale.pad.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                            .padding(horizontal = scale.pad.dp, vertical = 6.dp),
                 ) {
-                    Column(modifier = GlanceModifier.defaultWeight()) {
-                        if (data.showSender) {
-                            Text(
-                                text = name,
-                                maxLines = 1,
-                                style = textStyle(
-                                    style,
-                                    ColorProvider(Color.White),
-                                    scale.nameSize,
-                                    FontWeight.Bold,
-                                ),
-                            )
+                    if (showUserCaption) {
+                        Text(
+                            text = parsed.userCaption,
+                            maxLines = 2,
+                            style = textStyle(
+                                style,
+                                ColorProvider(Color.White),
+                                scale.captionSize,
+                                FontWeight.Bold,
+                            ),
+                        )
+                        if (data.showSender || (data.showTimestamp && liveTime.isNotBlank())) {
+                            Spacer(GlanceModifier.height(4.dp))
                         }
-                        if (data.showTimestamp && liveTime.isNotBlank()) {
-                            Text(
-                                text = liveTime,
-                                style = textStyle(
-                                    style,
-                                    ColorProvider(Color(0xCCFFFFFF)),
-                                    scale.timeSize,
-                                    FontWeight.Medium,
-                                ),
-                            )
+                    }
+                    Row(
+                        modifier = GlanceModifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = GlanceModifier.defaultWeight()) {
+                            if (data.showSender) {
+                                Text(
+                                    text = name,
+                                    maxLines = 1,
+                                    style = textStyle(
+                                        style,
+                                        ColorProvider(Color.White),
+                                        scale.nameSize,
+                                        FontWeight.Bold,
+                                    ),
+                                )
+                            }
+                            if (data.showTimestamp && liveTime.isNotBlank()) {
+                                Text(
+                                    text = liveTime,
+                                    style = textStyle(
+                                        style,
+                                        ColorProvider(Color(0xCCFFFFFF)),
+                                        scale.timeSize,
+                                        FontWeight.Medium,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-        if (data.showStreak && data.streakCount > 0) {
+        if (momentStreak != null) {
             Box(
                 modifier = GlanceModifier.fillMaxSize(),
                 contentAlignment = Alignment.TopEnd,
             ) {
                 Box(modifier = GlanceModifier.padding(6.dp)) {
-                    WidgetStreakBadge(count = data.streakCount, compact = true)
+                    WidgetStreakBadge(count = momentStreak, compact = true)
                 }
             }
         }
@@ -375,16 +433,29 @@ private data class WidgetLayoutScale(
     val overlayHeight: Int,
     val nameSize: Int,
     val timeSize: Int,
+    val captionSize: Int,
     val headerSize: Int,
     val pad: Int,
 )
 
-private fun layoutScale(displaySize: String): WidgetLayoutScale =
-    when (displaySize) {
-        "small" -> WidgetLayoutScale(48, 11, 9, 9, 6)
-        "medium" -> WidgetLayoutScale(58, 12, 10, 10, 8)
-        else -> WidgetLayoutScale(72, 14, 11, 11, 10)
-    }
+private fun layoutScale(
+    displaySize: String,
+    parsed: ParsedMomentCaption = ParsedMomentCaption(),
+): WidgetLayoutScale {
+    val base =
+        when (displaySize) {
+            "small" -> WidgetLayoutScale(48, 11, 9, 10, 9, 6)
+            "medium" -> WidgetLayoutScale(58, 12, 10, 11, 10, 8)
+            else -> WidgetLayoutScale(72, 14, 11, 12, 11, 10)
+        }
+    val captionBoost =
+        if (parsed.userCaption.isNotBlank()) {
+            if (parsed.userCaption.length > 28) 22 else 14
+        } else {
+            0
+        }
+    return base.copy(overlayHeight = base.overlayHeight + captionBoost)
+}
 
 @Composable
 private fun BlurMomentLayout(
@@ -395,72 +466,99 @@ private fun BlurMomentLayout(
 ) {
     val open = openMomentAction(data)
     val name = data.senderName.ifBlank { "Moment" }
+    val momentStreak = WidgetCaptionParser.streakCountFromCaption(data.caption)
+    val scale = layoutScale(data.displaySize)
+    val showBottomBar =
+        data.showSender || (data.showTimestamp && liveTime.isNotBlank())
 
     Box(
         modifier =
             GlanceModifier
                 .fillMaxSize()
-                .padding(8.dp)
                 .clickable(open),
-        contentAlignment = Alignment.BottomStart,
+        contentAlignment = Alignment.TopStart,
     ) {
         Image(
             provider = ImageProvider(bitmap),
             contentDescription = "Hidden moment from ${data.senderName}",
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .cornerRadius(16.dp),
+            modifier = GlanceModifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
         Box(
             modifier =
                 GlanceModifier
                     .fillMaxSize()
-                    .cornerRadius(16.dp)
-                    .background(ColorProvider(Color(0x59000000))),
+                    .background(ColorProvider(Color(0x55000000))),
         ) {}
-        Column(
-            modifier =
-                GlanceModifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            if (data.showSender) {
-                Text(
-                    text = "❤️  $name",
-                    maxLines = 1,
-                    style = textStyle(style, ColorProvider(Color.White), 12, FontWeight.Bold),
-                )
-            }
-            Spacer(GlanceModifier.defaultWeight())
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
+        if (showBottomBar) {
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomStart,
             ) {
-                Column(modifier = GlanceModifier.defaultWeight()) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .height(scale.overlayHeight.dp)
+                            .background(ColorProvider(Color(0xCC000000))),
+                ) {}
+                Column(
+                    modifier =
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .padding(horizontal = scale.pad.dp, vertical = 6.dp),
+                ) {
                     if (data.showSender) {
                         Text(
                             text = name,
                             maxLines = 1,
-                            style = textStyle(style, ColorProvider(Color.White), 14, FontWeight.Bold),
+                            style = textStyle(
+                                style,
+                                ColorProvider(Color.White),
+                                scale.nameSize,
+                                FontWeight.Bold,
+                            ),
                         )
                     }
                     if (data.showTimestamp && liveTime.isNotBlank()) {
                         Text(
                             text = liveTime,
-                            modifier = GlanceModifier.padding(top = 2.dp),
-                            style = textStyle(style, ColorProvider(Color(0xCCFFFFFF)), 12),
+                            style = textStyle(
+                                style,
+                                ColorProvider(Color(0xCCFFFFFF)),
+                                scale.timeSize,
+                            ),
                         )
                     }
                 }
-                if (data.showStreak && data.streakCount > 0) {
-                    WidgetStreakBadge(count = data.streakCount)
+            }
+        }
+        if (momentStreak != null) {
+            Box(
+                modifier = GlanceModifier.fillMaxSize(),
+                contentAlignment = Alignment.TopEnd,
+            ) {
+                Box(modifier = GlanceModifier.padding(6.dp)) {
+                    WidgetStreakBadge(count = momentStreak, compact = true)
                 }
             }
         }
     }
+}
+
+/** Safe placeholder when the device is locked and lock-screen privacy is enabled. */
+@Composable
+private fun SafePlaceholderLayout(
+    style: WidgetThemeStyle,
+    open: androidx.glance.action.Action,
+) {
+    PrivateMomentLayout(
+        title = "New Moment",
+        from = "Unlock to view",
+        action = "Tap to open Moment",
+        style = style,
+        open = open,
+    )
 }
 
 @Composable
@@ -751,6 +849,9 @@ private fun LocketPhotoLayout(
     val liveTime =
         WidgetRelativeTime.format(data.createdAtMillis).ifBlank { data.relativeTime }
     val sender = data.senderName.ifBlank { "Friend" }
+    val parsed = WidgetCaptionParser.parse(data.caption)
+    val momentStreak = WidgetCaptionParser.streakCountFromCaption(data.caption)
+    val showUserCaption = data.showCaptions && parsed.userCaption.isNotBlank()
 
     Box(
         modifier =
@@ -765,6 +866,7 @@ private fun LocketPhotoLayout(
             modifier = GlanceModifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
+        WidgetMomentOverlays(parsed = parsed)
         Box(
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.BottomStart,
@@ -773,43 +875,60 @@ private fun LocketPhotoLayout(
                 modifier =
                     GlanceModifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height((if (showUserCaption) 64 else 52).dp)
                         .background(ColorProvider(Color(0xA6000000))),
             ) {}
-            Row(
+            Column(
                 modifier =
                     GlanceModifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
-                Column(modifier = GlanceModifier.defaultWeight()) {
-                    if (data.showSender) {
-                        Text(
-                            text = sender,
-                            maxLines = 1,
-                            style = textStyle(
-                                style,
-                                ColorProvider(Color.White),
-                                13,
-                                FontWeight.Bold,
-                            ),
-                        )
-                    }
-                    if (data.showTimestamp && liveTime.isNotBlank()) {
-                        Text(
-                            text = liveTime,
-                            style = textStyle(
-                                style,
-                                ColorProvider(Color(0xCCFFFFFF)),
-                                10,
-                                FontWeight.Medium,
-                            ),
-                        )
-                    }
+                if (showUserCaption) {
+                    Text(
+                        text = parsed.userCaption,
+                        maxLines = 2,
+                        style = textStyle(
+                            style,
+                            ColorProvider(Color.White),
+                            11,
+                            FontWeight.Bold,
+                        ),
+                    )
+                    Spacer(GlanceModifier.height(4.dp))
                 }
-                if (data.showStreak && data.streakCount > 0) {
-                    WidgetStreakBadge(count = data.streakCount)
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = GlanceModifier.defaultWeight()) {
+                        if (data.showSender) {
+                            Text(
+                                text = sender,
+                                maxLines = 1,
+                                style = textStyle(
+                                    style,
+                                    ColorProvider(Color.White),
+                                    13,
+                                    FontWeight.Bold,
+                                ),
+                            )
+                        }
+                        if (data.showTimestamp && liveTime.isNotBlank()) {
+                            Text(
+                                text = liveTime,
+                                style = textStyle(
+                                    style,
+                                    ColorProvider(Color(0xCCFFFFFF)),
+                                    10,
+                                    FontWeight.Medium,
+                                ),
+                            )
+                        }
+                    }
+                    if (momentStreak != null) {
+                        WidgetStreakBadge(count = momentStreak)
+                    }
                 }
             }
         }

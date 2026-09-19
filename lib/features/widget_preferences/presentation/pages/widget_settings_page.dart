@@ -220,63 +220,18 @@ class _WidgetSettingsViewState extends State<_WidgetSettingsView> {
               ),
               const SizedBox(height: 32),
               SettingsSection(
-                title: 'Privacy',
+                title: 'What appears',
                 children: [
                   SettingsNavRow(
-                    label: 'Mode',
-                    value: draft.privacyMode.label,
-                    onTap: () => _pickPrivacyMode(context, cubit, draft),
-                  ),
-                  SettingsToggleRow(
-                    label: 'Lock screen',
-                    value: draft.lockScreenPrivacy,
-                    onChanged: (value) {
-                      cubit.setLockScreenPrivacy(value);
-                      unawaited(cubit.savePrivacy(silent: true));
-                    },
-                  ),
-                  SettingsToggleRow(
-                    label: 'Pause updates',
-                    value: draft.paused,
-                    onChanged: (value) {
-                      cubit.setPaused(value);
-                      unawaited(cubit.savePrivacy(silent: true));
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              SettingsSection(
-                title: 'Shown',
-                children: [
-                  SettingsNavRow(
-                    label: 'Person',
+                    label: 'Moment source',
+                    subtitle: 'Latest, one person, or a circle',
                     value: person,
                     onTap: () => _pickSource(context, cubit, state),
                   ),
-                  SettingsToggleRow(
-                    label: 'Sender',
-                    value: draft.showSender,
-                    onChanged: (value) {
-                      cubit.setShowSender(value);
-                      unawaited(cubit.savePrivacy(silent: true));
-                    },
-                  ),
-                  SettingsToggleRow(
-                    label: 'Timestamp',
-                    value: draft.showTimestamp,
-                    onChanged: (value) {
-                      cubit.setShowTimestamp(value);
-                      unawaited(cubit.savePrivacy(silent: true));
-                    },
-                  ),
-                  SettingsToggleRow(
-                    label: 'Captions',
-                    value: draft.showCaptions,
-                    onChanged: (value) {
-                      cubit.setShowCaptions(value);
-                      unawaited(cubit.savePrivacy(silent: true));
-                    },
+                  SettingsNavRow(
+                    label: 'Privacy & display',
+                    subtitle: 'How moments look on your widget',
+                    onTap: () => context.push(AppRoutes.widgetPrivacy),
                   ),
                 ],
               ),
@@ -344,34 +299,6 @@ class _WidgetSettingsViewState extends State<_WidgetSettingsView> {
         'Circle',
       WidgetMode.latest => 'Latest',
     };
-  }
-
-  Future<void> _pickPrivacyMode(
-    BuildContext context,
-    WidgetCustomizationCubit cubit,
-    WidgetPreferences draft,
-  ) async {
-    final changed = await MomentBottomSheet.show<bool>(
-      context,
-      title: 'Privacy mode',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: WidgetPrivacyMode.values
-            .map(
-              (mode) => _SheetChoice(
-                label: mode.label,
-                subtitle: mode.description,
-                selected: draft.privacyMode == mode,
-                onTap: () {
-                  cubit.setPrivacyMode(mode);
-                  Navigator.of(context).pop(true);
-                },
-              ),
-            )
-            .toList(),
-      ),
-    );
-    if (changed == true) await cubit.savePrivacy(silent: true);
   }
 
   Future<void> _pickSource(

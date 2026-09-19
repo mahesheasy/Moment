@@ -185,7 +185,7 @@ object MomentWidgetDataStore {
         val senderId =
             active?.senderId
                 ?: (prefs.getString(KEY_SENDER_ID, "") ?: "")
-        val effectivePrivacy = WidgetPrivacyResolver.resolve(context, senderId)
+        val effectivePrivacy = WidgetPrivacyResolver.resolvePrivacyForSender(context, senderId)
 
         return MomentWidgetData(
             hasMoment = prefs.getBoolean(KEY_HAS_MOMENT, false) || active != null,
