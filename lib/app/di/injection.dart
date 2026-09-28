@@ -46,6 +46,11 @@ import 'package:moment/features/friends/data/datasources/friends_remote_data_sou
 import 'package:moment/features/friends/data/repositories/friends_repository_impl.dart';
 import 'package:moment/features/friends/domain/repositories/friends_repository.dart';
 import 'package:moment/features/friends/presentation/cubit/friends_cubit.dart';
+import 'package:moment/features/home_setup/data/datasources/user_setup_remote_data_source.dart';
+import 'package:moment/features/home_setup/data/repositories/user_setup_repository_impl.dart';
+import 'package:moment/features/home_setup/domain/repositories/user_setup_repository.dart';
+import 'package:moment/features/home_setup/domain/services/widget_reminder_policy.dart';
+import 'package:moment/features/home_setup/presentation/cubit/home_setup_cubit.dart';
 import 'package:moment/features/memories/data/datasources/memories_remote_data_source.dart';
 import 'package:moment/features/memories/data/repositories/memory_repository_impl.dart';
 import 'package:moment/features/memories/domain/repositories/memory_repository.dart';
@@ -83,6 +88,10 @@ import 'package:moment/features/settings/domain/repositories/support_repository.
 import 'package:moment/features/settings/presentation/cubit/appearance_cubit.dart';
 import 'package:moment/features/settings/presentation/cubit/notification_settings_cubit.dart';
 import 'package:moment/features/settings/presentation/cubit/report_problem_cubit.dart';
+import 'package:moment/features/shared_pet/data/datasources/pet_remote_datasource.dart';
+import 'package:moment/features/shared_pet/data/repositories/pet_repository_impl.dart';
+import 'package:moment/features/shared_pet/domain/repositories/pet_repository.dart';
+import 'package:moment/features/shared_pet/domain/services/pet_moment_integration_bus.dart';
 import 'package:moment/features/subscription/data/datasources/subscription_remote_data_source.dart';
 import 'package:moment/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:moment/features/subscription/domain/repositories/subscription_repository.dart';
@@ -276,6 +285,17 @@ Future<void> configureDependencies({
       () => sl<AuthRepository>().currentUserId,
     ),
   );
+  sl
+    ..registerLazySingleton<PetRemoteDataSource>(
+      () => PetRemoteDataSource(sl()),
+    )
+    ..registerLazySingleton<PetRepository>(
+      () => PetRepositoryImpl(
+        sl(),
+        () => sl<AuthRepository>().currentUserId,
+      ),
+    )
+    ..registerLazySingleton(PetMomentIntegrationBus.new);
 
   sl
     ..registerLazySingleton(SetupPreferencesLocalCache.new)
@@ -322,6 +342,25 @@ Future<void> configureDependencies({
     ..registerFactory(() => ProfileCubit(sl(), sl(), sl(), sl(), sl(), sl()))
     ..registerFactory(() => AccountCubit(sl(), sl(), sl()))
     ..registerLazySingleton(() => const DeviceContactsDataSource())
+    ..registerLazySingleton<UserSetupRemoteDataSource>(
+      () => UserSetupRemoteDataSource(sl()),
+    )
+    ..registerLazySingleton<UserSetupRepository>(
+      () => UserSetupRepositoryImpl(
+        sl(),
+        () => sl<AuthRepository>().currentUserId,
+      ),
+    )
+    ..registerLazySingleton(() => const WidgetReminderPolicy())
+    ..registerFactory(
+      () => HomeSetupCubit(
+        sl(),
+        sl(),
+        sl(),
+        sl(),
+        () => sl<AuthRepository>().currentUserId,
+      ),
+    )
     ..registerFactory(() => FriendsCubit(sl(), sl(), sl()))
     ..registerFactoryParam<FriendProfileCubit, String, void>(
       (userId, _) => FriendProfileCubit(sl(), userId),

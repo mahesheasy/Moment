@@ -24,6 +24,7 @@ import 'package:moment/features/moments/presentation/widgets/live_camera_host.da
 import 'package:moment/features/moments/presentation/widgets/reaction_picker_sheet.dart';
 import 'package:moment/features/moments/presentation/widgets/tinder_moment_deck.dart';
 import 'package:moment/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:moment/features/home_setup/presentation/widgets/home_setup_coordinator.dart';
 import 'package:moment/features/settings/presentation/widgets/settings_type.dart';
 
 class HomePage extends StatefulWidget {
@@ -64,7 +65,7 @@ class _HomePageState extends State<HomePage> {
         BlocProvider(create: (_) => sl<PingsCubit>()..load()),
         BlocProvider(create: (_) => sl<CameraCubit>()..initialize()),
       ],
-      child: const _HomeView(),
+      child: const HomeSetupCoordinator(child: _HomeView()),
     );
   }
 }

@@ -110,6 +110,14 @@ class FriendsRemoteDataSource {
     return count;
   }
 
+  Future<int> countAcceptedFriends(String userId) async {
+    final rows = await _client
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', userId);
+    return (rows as List).length;
+  }
+
   Future<List<FriendSummary>> getFriends(String userId) async {
     final data = await _client
         .from('friendships')

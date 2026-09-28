@@ -17,6 +17,7 @@ import 'package:moment/features/friends/presentation/widgets/friend_profile/frie
 import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_actions.dart';
 import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_hero.dart';
 import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_private_space_card.dart';
+import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_our_pet_card.dart';
 import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_stats.dart';
 import 'package:moment/features/friends/presentation/widgets/friend_profile/friend_profile_top_bar.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
@@ -152,6 +153,10 @@ class _FriendProfileView extends StatelessWidget {
                 const SizedBox(height: 28),
                 FriendProfilePrivateSpaceCard(
                   onTap: () => _openPrivateSpace(context, profile),
+                ),
+                const SizedBox(height: 28),
+                FriendProfileOurPetCard(
+                  onTap: () => context.push(AppRoutes.sharedPet(userId)),
                 ),
               ],
               if (aboutRows.isNotEmpty) ...[

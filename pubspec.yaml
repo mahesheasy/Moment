@@ -32,6 +32,8 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.11
   path_provider: ^2.1.5
+  flutter_3d_controller: ^2.3.0
+  lottie: ^3.3.1
 
 dev_dependencies:
   bloc_test: ^10.0.0
@@ -62,6 +64,8 @@ flutter:
     - assets/images/auth_logo_m.png
     - assets/images/onboarding/
     - assets/images/setup/
+    - assets/pets/cat/
+    - assets/lottie/
   fonts:
     - family: Poppins
       fonts:

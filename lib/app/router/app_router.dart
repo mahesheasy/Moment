@@ -45,6 +45,8 @@ import 'package:moment/features/auth/data/datasources/setup_preferences_local_ca
 import 'package:moment/core/constants/app_constants.dart';
 import 'package:moment/core/deep_links/deep_link_mapper.dart';
 import 'package:moment/features/profile/domain/entities/user_profile.dart';
+import 'package:moment/features/shared_pet/presentation/screens/create_pet_screen.dart';
+import 'package:moment/features/shared_pet/presentation/screens/shared_pet_screen.dart';
 
 GoRouter createAppRouter({
   required SessionCubit sessionCubit,
@@ -264,6 +266,20 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) =>
             FriendProfilePage(userId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/friends/:id/pet',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => SharedPetScreen(
+          friendUserId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/friends/:id/pet/create',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => CreatePetScreen(
+          friendUserId: state.pathParameters['id'] ?? '',
+        ),
       ),
       GoRoute(
         path: AppRoutes.blockedUsers,

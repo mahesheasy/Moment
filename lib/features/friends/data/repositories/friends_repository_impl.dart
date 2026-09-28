@@ -27,6 +27,19 @@ class FriendsRepositoryImpl implements FriendsRepository {
   }
 
   @override
+  Future<Result<int>> countAcceptedFriends() async {
+    final userId = _userId;
+    if (userId == null) return const Failed(AuthenticationFailure());
+
+    try {
+      return Success(await _remote.countAcceptedFriends(userId));
+    } on Object catch (error) {
+      if (error is Failure) return Failed(error);
+      return Failed(_remote.mapError(error));
+    }
+  }
+
+  @override
   Future<Result<List<FriendRequest>>> getIncomingRequests() async {
     final userId = _userId;
     if (userId == null) return const Failed(AuthenticationFailure());

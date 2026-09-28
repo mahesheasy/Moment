@@ -5,6 +5,8 @@ import 'package:moment/features/profile/domain/entities/user_profile.dart';
 abstract class FriendsRepository {
   Future<Result<List<FriendSummary>>> getFriends();
 
+  Future<Result<int>> countAcceptedFriends();
+
   Future<Result<List<FriendRequest>>> getIncomingRequests();
 
   Future<Result<List<FriendRequest>>> getOutgoingRequests();

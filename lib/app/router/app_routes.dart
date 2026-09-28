@@ -39,6 +39,11 @@ class AppRoutes {
 
   static String friend(String id) => '/friends/$id';
 
+  static String sharedPet(String friendUserId) => '/friends/$friendUserId/pet';
+
+  static String sharedPetCreate(String friendUserId) =>
+      '/friends/$friendUserId/pet/create';
+
   static String cameraForPrompt({
     required String circleId,
     required String promptId,
